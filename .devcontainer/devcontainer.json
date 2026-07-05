@@ -1,0 +1,43 @@
+{
+  "name": "Expo Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "remoteUser": "node",
+  "postCreateCommand": "npm ci",
+  "containerEnv": {
+    "EXPO_NO_TELEMETRY": "1",
+    "CHOKIDAR_USEPOLLING": "1"
+  },
+  "forwardPorts": [
+    8081,
+    19000,
+    19001,
+    19002,
+    19006
+  ],
+  "portsAttributes": {
+    "8081": {
+      "label": "Metro Bundler"
+    },
+    "19000": {
+      "label": "Expo DevTools"
+    },
+    "19001": {
+      "label": "Expo LAN"
+    },
+    "19002": {
+      "label": "Expo Tunnel"
+    },
+    "19006": {
+      "label": "Expo Web"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "expo.vscode-expo-tools"
+      ]
+    }
+  }
+}
