@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { AppShell, AppMenuItem } from 'components/AppShell';
+import { AppShell } from 'components/AppShell';
 import { HomeScreen } from 'components/HomeScreen';
 import { DrawingScreen } from 'components/DrawingScreen';
 import { databaseService } from 'services/DatabaseService';
@@ -15,11 +15,6 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [homeKey, setHomeKey] = useState(0);
-
-  const getTodayString = () => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  };
 
   useEffect(() => {
     // Initialize database when app starts
@@ -43,34 +38,12 @@ export default function App() {
     setHomeKey((prev) => prev + 1);
   };
 
-  const handleTodaySelect = () => {
-    const todayString = getTodayString();
-    log.info('Navigating to today from menu', { date: todayString });
-    setSelectedDate(todayString);
-    setCurrentScreen('drawing');
-  };
-
-  const menuItems: AppMenuItem[] = [
-    {
-      label: 'Home',
-      description: 'Calendar and saved days',
-      icon: 'calendar-outline',
-      onPress: handleBackToHome,
-    },
-    {
-      label: "Today's Note",
-      description: 'Open a fresh page for today',
-      icon: 'create-outline',
-      onPress: handleTodaySelect,
-    },
-  ];
-
   return (
-    <AppShell menuItems={menuItems}>
-      {(openMenu) => (
+    <AppShell menuItems={[]}>
+      {() => (
         <>
           {currentScreen === 'home' ? (
-            <HomeScreen key={homeKey} onDateSelect={handleDateSelect} onOpenMenu={openMenu} />
+            <HomeScreen key={homeKey} onDateSelect={handleDateSelect} />
           ) : (
             <DrawingScreen date={selectedDate} onBack={handleBackToHome} />
           )}
