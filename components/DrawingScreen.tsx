@@ -14,6 +14,7 @@ import Svg, { Defs, Line, Path, Pattern, Rect } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { databaseService } from '../services/DatabaseService';
+import { getJournalType, JournalTypeId } from '../services/JournalTypes';
 import { drawingLog, uiLog } from '../services/Logger';
 import { drawingColors, palette } from './theme';
 
@@ -55,6 +56,7 @@ const smoothPath = (points: { x: number; y: number }[]): string => {
 
 interface DrawingScreenProps {
   date: string;
+  journalType: JournalTypeId;
   onBack: () => void;
 }
 
@@ -66,7 +68,7 @@ interface DrawingPath {
 
 const strokeWidths = [1, 3, 6, 10];
 
-export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) => {
+export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType, onBack }) => {
   const [paths, setPaths] = useState<DrawingPath[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
@@ -100,7 +102,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
 
     drawingLog.info('Loading drawing', { date });
     databaseService
-      .loadDrawing(date)
+      .loadDrawing(date, journalType)
       .then((savedPaths) => {
         if (!cancelled) {
           setPaths(savedPaths);
@@ -114,7 +116,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, journalType]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -212,7 +214,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
   const saveDrawing = async (newPaths: DrawingPath[]) => {
     try {
       drawingLog.info('Saving drawing', { date, pathCount: newPaths.length });
-      await databaseService.saveDrawing(date, newPaths);
+      await databaseService.saveDrawing(date, journalType, newPaths);
       drawingLog.debug('Drawing saved successfully', { date });
     } catch (error) {
       drawingLog.error('Error saving drawing', { date, error });
@@ -449,7 +451,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
       setCurrentPath('');
       setCurrentPoints([]);
       setIsDrawing(false);
-      await databaseService.deleteDrawing(date);
+      await databaseService.deleteDrawing(date, journalType);
       drawingLog.info('Drawing cleared', { date });
     } catch (error) {
       drawingLog.error('Error clearing drawing', { date, error });
@@ -510,6 +512,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
   };
 
   const formattedDate = formatDate(date);
+  const journal = getJournalType(journalType);
   const toolOptionsPanelWidth = Math.max(
     220,
     Math.min(width - 32, activeToolOptions === 'pen' ? 430 : 320)
@@ -525,9 +528,14 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
               className="mr-3 h-11 w-11 items-center justify-center rounded-lg bg-sky-soft">
               <Ionicons name="arrow-back" size={23} color={palette.sky} />
             </TouchableOpacity>
-            <Text className="flex-1 text-lg font-bold text-ink" numberOfLines={1}>
-              {formattedDate}
-            </Text>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-ink" numberOfLines={1}>
+                {journal.name}
+              </Text>
+              <Text className="text-xs text-muted" numberOfLines={1}>
+                {formattedDate}
+              </Text>
+            </View>
           </View>
 
           <View className="flex-row rounded-lg bg-canvas p-1" style={{ position: 'relative' }}>
