@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   Alert,
   PanResponder,
@@ -9,13 +11,16 @@ import {
   LayoutChangeEvent,
   StyleSheet,
   Platform,
+  Image,
 } from 'react-native';
-import Svg, { Defs, Line, Path, Pattern, Rect } from 'react-native-svg';
+import Svg, { Defs, Line, Path, Pattern, Rect, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { databaseService } from '../services/DatabaseService';
+import { ImportedJournalContent } from '../services/ImportTypes';
 import { getJournalType, JournalTypeId } from '../services/JournalTypes';
 import { drawingLog, uiLog } from '../services/Logger';
+import { textToSvgService } from '../services/TextToSvgService';
 import { drawingColors, palette } from './theme';
 
 // Smooth a path using quadratic curves
@@ -83,6 +88,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [importedContent, setImportedContent] = useState<ImportedJournalContent | null>(null);
+  const [isImportingImage, setIsImportingImage] = useState(false);
+  const [transcribedTextDraft, setTranscribedTextDraft] = useState('');
 
   const { width, height } = Dimensions.get('window');
   const drawingHeight = Math.max(height - 150, 320);
@@ -112,6 +120,26 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       .catch((error) => {
         drawingLog.error('Error loading drawing', { date, error });
       });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [date, journalType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    databaseService
+      .loadImportedJournalContent(date, journalType)
+      .then((content) => {
+        if (!cancelled) {
+          setImportedContent(content);
+          setTranscribedTextDraft(content?.transcribedText ?? '');
+        }
+      })
+      .catch((error) =>
+        drawingLog.error('Error loading imported journal content', { date, error })
+      );
 
     return () => {
       cancelled = true;
@@ -451,6 +479,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       setCurrentPath('');
       setCurrentPoints([]);
       setIsDrawing(false);
+      setImportedContent(null);
+      setTranscribedTextDraft('');
       await databaseService.deleteDrawing(date, journalType);
       drawingLog.info('Drawing cleared', { date });
     } catch (error) {
@@ -477,24 +507,95 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     ]);
   };
 
-  const takePicture = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+  const captureImage = async (): Promise<string | null> => {
+    if (Platform.OS !== 'web') {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
 
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission required', 'Camera permission is required to take pictures.');
-      return;
+      if (!permissionResult.granted) {
+        Alert.alert(
+          'Permission required',
+          'Camera permission is required to import journal pages.'
+        );
+        return null;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets[0]?.uri) {
+        return null;
+      }
+
+      return result.assets[0].uri;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
       quality: 1,
     });
 
-    if (!result.canceled) {
-      // TODO: Handle image insertion into drawing
-      console.log('Image captured:', result.assets[0].uri);
+    if (result.canceled || !result.assets[0]?.uri) {
+      return null;
+    }
+
+    return result.assets[0].uri;
+  };
+
+  const saveImportedContent = async (content: ImportedJournalContent) => {
+    await databaseService.saveImportedJournalContent(content);
+    await databaseService.createJournalEntry(date, journalType);
+    setImportedContent(content);
+  };
+
+  const takePicture = async () => {
+    setIsImportingImage(true);
+    try {
+      const sourceImageUri = await captureImage();
+      if (!sourceImageUri) {
+        return;
+      }
+
+      const nextContent: ImportedJournalContent = {
+        date,
+        journalType,
+        sourceImageUri,
+        transcribedText: importedContent?.transcribedText ?? '',
+      };
+
+      await saveImportedContent(nextContent);
+      setTranscribedTextDraft(nextContent.transcribedText);
+      Alert.alert(
+        'Page imported',
+        'Your journal page was added. Type the text you want rendered into the journal canvas.'
+      );
+    } catch (error) {
+      drawingLog.error('Error importing journal page', { date, error });
+      Alert.alert('Import failed', 'We could not import that journal page. Please try again.');
+    } finally {
+      setIsImportingImage(false);
+    }
+  };
+
+  const saveTranscribedText = async () => {
+    if (!importedContent) {
+      return;
+    }
+
+    try {
+      const nextContent: ImportedJournalContent = {
+        ...importedContent,
+        transcribedText: transcribedTextDraft,
+      };
+      await saveImportedContent(nextContent);
+      Alert.alert('Text saved', 'Your transcribed text is now rendered in the journal.');
+    } catch (error) {
+      drawingLog.error('Error saving transcribed text', { date, error });
+      Alert.alert('Save failed', 'We could not save your transcribed text.');
     }
   };
 
@@ -513,6 +614,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
   const formattedDate = formatDate(date);
   const journal = getJournalType(journalType);
+  const importedTextLines = textToSvgService.createLines(transcribedTextDraft);
   const toolOptionsPanelWidth = Math.max(
     220,
     Math.min(width - 32, activeToolOptions === 'pen' ? 430 : 320)
@@ -650,6 +752,42 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       </View>
 
       <View className="flex-1 bg-canvas p-4">
+        {(isImportingImage || importedContent) && (
+          <View className="mb-3 rounded-xl border border-line bg-paper p-3">
+            {isImportingImage && (
+              <View className="mb-2 flex-row items-center">
+                <ActivityIndicator size="small" color={palette.teal} />
+                <Text className="ml-2 text-sm font-semibold text-muted">Importing page...</Text>
+              </View>
+            )}
+            {importedContent && (
+              <>
+                <Text className="mb-2 text-sm font-bold text-ink">Imported page</Text>
+                <Image
+                  source={{ uri: importedContent.sourceImageUri }}
+                  className="mb-2 h-28 w-full rounded-lg"
+                  resizeMode="cover"
+                />
+                <Text className="mb-2 text-sm font-semibold text-muted">Transcribed text</Text>
+                <TextInput
+                  multiline
+                  value={transcribedTextDraft}
+                  onChangeText={setTranscribedTextDraft}
+                  placeholder="Type the journal text you want drawn into the page..."
+                  placeholderTextColor={palette.subtle}
+                  style={styles.transcriptionInput}
+                  textAlignVertical="top"
+                />
+                <TouchableOpacity
+                  onPress={saveTranscribedText}
+                  className="mt-3 items-center rounded-lg bg-teal px-4 py-3">
+                  <Text className="text-sm font-bold text-paper">Save text to journal</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
         <View
           className="bg-surface overflow-hidden border border-line"
           style={{
@@ -700,6 +838,18 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               />
             ))}
 
+            {importedTextLines.map((line, index) => (
+              <SvgText
+                key={`${line.y}-${index}`}
+                x={line.x}
+                y={line.y}
+                fill={palette.ink}
+                fontSize={textToSvgService.getFontSize()}
+                fontWeight="500">
+                {line.text}
+              </SvgText>
+            ))}
+
             {currentPath && (
               <Path
                 d={currentPath}
@@ -747,5 +897,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 18,
     top: 54,
+  },
+  transcriptionInput: {
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: palette.ink,
+    minHeight: 120,
+    padding: 12,
   },
 });

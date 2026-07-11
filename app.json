@@ -12,6 +12,13 @@
     "plugins": [
       "expo-sqlite",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Notes to capture paper journal pages for import.",
+          "photosPermission": "Allow Notes to choose journal page photos for import."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
@@ -26,14 +33,18 @@
     "userInterfaceStyle": "light",
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Notes to capture paper journal pages for import."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.notes"
+      "package": "com.anonymous.notes",
+      "permissions": ["CAMERA"]
     }
   }
 }

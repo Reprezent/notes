@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ImportedJournalContent } from './ImportTypes';
 import { isJournalType, JournalTypeId } from './JournalTypes';
 
 export interface Drawing {
@@ -13,6 +14,10 @@ export interface Drawing {
 class WebDatabaseService {
   private getStorageKey(date: string, journalType: JournalTypeId): string {
     return `journal:${journalType}:${date}`;
+  }
+
+  private getImportStorageKey(date: string, journalType: JournalTypeId): string {
+    return `journal-import:${journalType}:${date}`;
   }
 
   async initDatabase(): Promise<void> {
@@ -131,9 +136,53 @@ class WebDatabaseService {
   async deleteDrawing(date: string, journalType: JournalTypeId): Promise<void> {
     try {
       const key = this.getStorageKey(date, journalType);
+      const importKey = this.getImportStorageKey(date, journalType);
       await AsyncStorage.removeItem(key);
+      await AsyncStorage.removeItem(importKey);
     } catch (error) {
       console.error('Error deleting journal entry:', error);
+      throw error;
+    }
+  }
+
+  async saveImportedJournalContent(content: ImportedJournalContent): Promise<void> {
+    try {
+      const key = this.getImportStorageKey(content.date, content.journalType);
+      const existingValue = await AsyncStorage.getItem(key);
+      const existing = existingValue ? (JSON.parse(existingValue) as ImportedJournalContent) : null;
+      const timestamp = new Date().toISOString();
+      const nextContent: ImportedJournalContent = {
+        ...content,
+        createdAt: existing?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+      };
+
+      await AsyncStorage.setItem(key, JSON.stringify(nextContent));
+    } catch (error) {
+      console.error('Error saving imported journal content:', error);
+      throw error;
+    }
+  }
+
+  async loadImportedJournalContent(
+    date: string,
+    journalType: JournalTypeId
+  ): Promise<ImportedJournalContent | null> {
+    try {
+      const key = this.getImportStorageKey(date, journalType);
+      const value = await AsyncStorage.getItem(key);
+
+      if (!value) {
+        return null;
+      }
+
+      const parsed = JSON.parse(value) as ImportedJournalContent & { ocrText?: string };
+      return {
+        ...parsed,
+        transcribedText: parsed.transcribedText ?? parsed.ocrText ?? '',
+      };
+    } catch (error) {
+      console.error('Error loading imported journal content:', error);
       throw error;
     }
   }
