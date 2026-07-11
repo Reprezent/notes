@@ -7,13 +7,7 @@
     "EXPO_NO_TELEMETRY": "1",
     "CHOKIDAR_USEPOLLING": "1"
   },
-  "forwardPorts": [
-    8081,
-    19000,
-    19001,
-    19002,
-    19006
-  ],
+  "forwardPorts": [8081, 19000, 19001, 19002, 19006],
   "portsAttributes": {
     "8081": {
       "label": "Metro Bundler"
@@ -33,11 +27,7 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": [
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "expo.vscode-expo-tools"
-      ]
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "expo.vscode-expo-tools"]
     }
   }
 }

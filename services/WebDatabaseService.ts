@@ -28,7 +28,7 @@ class WebDatabaseService {
         date,
         data: dataString,
         created_at: timestamp,
-        updated_at: timestamp
+        updated_at: timestamp,
       };
 
       await AsyncStorage.setItem(key, JSON.stringify(drawing));
@@ -59,8 +59,8 @@ class WebDatabaseService {
   async getAllDrawingDates(): Promise<string[]> {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const drawingKeys = keys.filter(key => key.startsWith('drawing_'));
-      const dates = drawingKeys.map(key => key.replace('drawing_', ''));
+      const drawingKeys = keys.filter((key) => key.startsWith('drawing_'));
+      const dates = drawingKeys.map((key) => key.replace('drawing_', ''));
       return dates.sort().reverse(); // Most recent first
     } catch (error) {
       console.error('Error getting drawing dates:', error);
