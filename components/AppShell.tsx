@@ -87,12 +87,20 @@ const styles = StyleSheet.create({
     width: '82%',
   },
   drawerHost: {
-    ...StyleSheet.absoluteFillObject,
+    bottom: 0,
     elevation: 50,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
     zIndex: 50,
   },
   drawerOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(47, 42, 58, 0.28)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
 });

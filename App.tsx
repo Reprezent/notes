@@ -5,7 +5,6 @@ import { HomeScreen } from 'components/HomeScreen';
 import { DrawingScreen } from 'components/DrawingScreen';
 import { databaseService } from 'services/DatabaseService';
 import { log } from 'services/Logger';
-import { palette } from 'components/theme';
 
 import './tailwind.css';
 
@@ -47,7 +46,7 @@ export default function App() {
           ) : (
             <DrawingScreen date={selectedDate} onBack={handleBackToHome} />
           )}
-          <StatusBar style="dark" backgroundColor={palette.background} />
+          <StatusBar style="dark" />
         </>
       )}
     </AppShell>

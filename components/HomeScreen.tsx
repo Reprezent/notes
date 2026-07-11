@@ -28,17 +28,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onDateSelect }) => {
   const [drawingDates, setDrawingDates] = useState<string[]>([]);
 
   useEffect(() => {
-    loadDrawingDates();
-  }, []);
+    let cancelled = false;
 
-  const loadDrawingDates = async () => {
-    try {
-      const dates = await databaseService.getAllDrawingDates();
-      setDrawingDates(dates);
-    } catch (error) {
-      console.error('Error loading drawing dates:', error);
-    }
-  };
+    databaseService
+      .getAllDrawingDates()
+      .then((dates) => {
+        if (!cancelled) {
+          setDrawingDates(dates);
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading drawing dates:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleTodayEntryStart = () => {
     uiLog.info('Starting today journal entry', { date: todayString });
