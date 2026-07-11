@@ -1,5 +1,5 @@
 import React, { ComponentProps, ReactNode, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from './theme';
 
@@ -75,16 +75,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, menuItems }) => {
 const styles = StyleSheet.create({
   drawer: {
     bottom: 0,
-    elevation: 24,
     left: 0,
     maxWidth: 320,
     position: 'absolute',
-    shadowColor: palette.ink,
-    shadowOffset: { width: 8, height: 0 },
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
     top: 0,
     width: '82%',
+    ...Platform.select({
+      web: {
+        boxShadow: '8px 0px 22px rgba(27, 58, 52, 0.14)',
+      },
+      default: {
+        elevation: 24,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 8, height: 0 },
+        shadowOpacity: 0.14,
+        shadowRadius: 22,
+      },
+    }),
   },
   drawerHost: {
     bottom: 0,

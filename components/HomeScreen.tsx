@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Animated,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
 import { databaseService, JournalEntry } from '../services/DatabaseService';
@@ -189,8 +197,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
                 </Text>
               </View>
               <View className="mt-7 flex-row items-end justify-end">
-                <View className="bg-surface mr-3 h-14 w-11 rounded-b-2xl rounded-t-lg shadow-sm" />
-                <View className="bg-surface h-20 w-28 rounded-lg border border-line p-2 shadow-sm">
+                <View className="bg-surface mr-3 h-14 w-11 rounded-b-2xl rounded-t-lg" />
+                <View className="bg-surface h-20 w-28 rounded-lg border border-line p-2">
                   <View className="bg-paper-line mb-2 h-1 w-16 rounded-full" />
                   <View className="bg-paper-line mb-2 h-1 w-20 rounded-full" />
                   <View className="bg-paper-line h-1 w-12 rounded-full" />
@@ -205,7 +213,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
               <Ionicons name="stats-chart-outline" size={22} color={palette.ink} />
               <Text className="ml-2 text-lg font-bold text-ink">Your progress</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-5"
+              contentContainerStyle={styles.progressCardsContent}>
               {progressCards.map((card) => (
                 <View key={card.label} style={styles.progressCard}>
                   <Text className="text-sm text-muted">{card.label}</Text>
@@ -431,12 +443,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.paper,
-    elevation: 12,
-    shadowColor: palette.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
     zIndex: 10,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
+      },
+      default: {
+        elevation: 12,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   heroTitle: {
     color: '#234237',
@@ -450,13 +469,27 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  progressCardsContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 2,
+  },
   progressCard: {
     backgroundColor: palette.paper,
-    borderColor: palette.border,
     borderRadius: 18,
-    borderWidth: 1,
     marginRight: 12,
     padding: 16,
     width: 176,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 6px 14px -3px rgba(27, 58, 52, 0.12)',
+      },
+      default: {
+        elevation: 2,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+    }),
   },
 });
