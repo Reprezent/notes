@@ -6,7 +6,7 @@ const defaultConfig = {
   dateFormat: 'time',
   printLevel: true,
   printDate: true,
-  enabled: true
+  enabled: true,
 };
 
 export const log = logger.createLogger(defaultConfig);

@@ -56,7 +56,11 @@ class DatabaseService {
 
     try {
       const dataString = JSON.stringify(drawingData);
-      dbLog.debug('Saving drawing to SQLite', { date, pathCount: drawingData.length, dataSize: dataString.length });
+      dbLog.debug('Saving drawing to SQLite', {
+        date,
+        pathCount: drawingData.length,
+        dataSize: dataString.length,
+      });
 
       await this.db!.runAsync(
         `INSERT OR REPLACE INTO drawings (date, data, updated_at)
@@ -84,10 +88,9 @@ class DatabaseService {
 
     try {
       dbLog.debug('Loading drawing from SQLite', { date });
-      const result = await this.db!.getFirstAsync(
-        `SELECT data FROM drawings WHERE date = ?`,
-        [date]
-      ) as { data: string } | null;
+      const result = (await this.db!.getFirstAsync(`SELECT data FROM drawings WHERE date = ?`, [
+        date,
+      ])) as { data: string } | null;
 
       if (result && result.data) {
         const parsedData = JSON.parse(result.data);
@@ -114,11 +117,11 @@ class DatabaseService {
     }
 
     try {
-      const results = await this.db!.getAllAsync(
+      const results = (await this.db!.getAllAsync(
         `SELECT date FROM drawings ORDER BY date DESC`
-      ) as { date: string }[];
+      )) as { date: string }[];
 
-      return results.map(row => row.date);
+      return results.map((row) => row.date);
     } catch (error) {
       console.error('Error getting drawing dates:', error);
       return [];
@@ -136,10 +139,7 @@ class DatabaseService {
     }
 
     try {
-      await this.db!.runAsync(
-        `DELETE FROM drawings WHERE date = ?`,
-        [date]
-      );
+      await this.db!.runAsync(`DELETE FROM drawings WHERE date = ?`, [date]);
 
       console.log('Drawing deleted for date:', date);
     } catch (error) {
@@ -159,10 +159,7 @@ class DatabaseService {
     }
 
     try {
-      const result = await this.db!.getFirstAsync(
-        `SELECT 1 FROM drawings WHERE date = ?`,
-        [date]
-      );
+      const result = await this.db!.getFirstAsync(`SELECT 1 FROM drawings WHERE date = ?`, [date]);
 
       return result !== null;
     } catch (error) {
