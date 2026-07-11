@@ -5,78 +5,109 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build web bundle
+  deploy:
+    name: Deploy main/PR preview to gh-pages
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: github.event_name == 'push' || github.event.action != 'closed'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: github.event_name == 'push' || github.event.action != 'closed'
         run: npm ci
 
-      - name: Determine deployment path
-        id: path
+      - name: Determine deployment target
+        id: target
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "base-path=/pr-${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "path=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
           else
-            echo "base-path=/" >> $GITHUB_OUTPUT
+            echo "path=." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Export bundle (web)
+        if: github.event_name == 'push' || github.event.action != 'closed'
         env:
-          EXPO_BASE_PATH: ${{ steps.path.outputs.base-path }}
+          EXPO_BASE_PATH: ${{ github.event_name == 'pull_request' && format('/pr-{0}/', github.event.pull_request.number) || '/' }}
         run: npx expo export --platform web
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/
+      - name: Checkout gh-pages branch
+        run: |
+          git fetch origin gh-pages || true
+          if git show-ref --quiet refs/remotes/origin/gh-pages; then
+            git worktree add gh-pages-worktree origin/gh-pages
+          else
+            git worktree add -b gh-pages gh-pages-worktree
+            cd gh-pages-worktree
+            git rm -rf . >/dev/null 2>&1 || true
+            touch .nojekyll
+            git add .nojekyll
+            git commit -m "Initialize gh-pages branch"
+            git push origin gh-pages
+          fi
 
-  deploy:
-    name: Deploy Pages
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+      - name: Update deployed content
+        run: |
+          cd gh-pages-worktree
+          target="${{ steps.target.outputs.path }}"
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.action }}" = "closed" ]; then
+            rm -rf "$target"
+          elif [ "$target" = "." ]; then
+            find . -mindepth 1 -maxdepth 1 ! -name ".git" ! -name "pr-*" -exec rm -rf {} +
+            cp -a ../dist/. .
+          else
+            rm -rf "$target"
+            mkdir -p "$target"
+            cp -a ../dist/. "$target/"
+          fi
 
-    steps:
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-        with:
-          enablement: true
+          touch .nojekyll
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Commit and push changes
+        run: |
+          cd gh-pages-worktree
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No Pages changes to publish."
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.action }}" = "closed" ]; then
+            git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            git commit -m "Update preview for PR #${{ github.event.pull_request.number }}"
+          else
+            git commit -m "Update main site from ${{ github.sha }}"
+          fi
+          git push origin HEAD:gh-pages
 
   pr-comment:
     name: Comment PR with preview URL
     needs: deploy
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - name: Comment on PR
