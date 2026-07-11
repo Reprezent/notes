@@ -47,9 +47,6 @@ jobs:
           EXPO_BASE_PATH: ${{ steps.path.outputs.base-path }}
         run: npx expo export --platform web
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -59,12 +56,18 @@ jobs:
     name: Deploy Pages
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
 
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        with:
+          enablement: true
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
@@ -93,4 +96,3 @@ jobs:
               issue_number: prNumber,
               body: `🚀 **Preview Ready!**\n\n[View PR Preview](${previewUrl})`
             });
-
