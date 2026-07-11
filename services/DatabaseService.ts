@@ -1,171 +1,106 @@
 import { Platform } from 'react-native';
-import { webDatabaseService } from './WebDatabaseService';
 import { dbLog } from './Logger';
+import { JournalTypeId } from './JournalTypes';
+import { webDatabaseService } from './WebDatabaseService';
 
-export interface Drawing {
-  id?: number;
+export interface JournalEntry {
   date: string;
-  data: string; // JSON string of drawing paths
-  created_at?: string;
-  updated_at?: string;
+  journalType: JournalTypeId;
 }
 
 class DatabaseService {
   private db: any = null;
 
   async initDatabase(): Promise<void> {
-    // Use web service for web platform
     if (Platform.OS === 'web') {
-      dbLog.info('Using web database service');
       return webDatabaseService.initDatabase();
     }
 
-    try {
-      dbLog.info('Initializing SQLite database for native platform');
-      // Dynamically import SQLite only for native platforms
-      const SQLite = await import('expo-sqlite');
-      this.db = await SQLite.openDatabaseAsync('journal.db');
-
-      await this.db.execAsync(`
-        CREATE TABLE IF NOT EXISTS drawings (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT UNIQUE NOT NULL,
-          data TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-
-      dbLog.info('Database initialized successfully');
-    } catch (error) {
-      dbLog.error('Error initializing database:', error);
-      throw error;
-    }
-  }
-
-  async saveDrawing(date: string, drawingData: any[]): Promise<void> {
-    // Use web service for web platform
-    if (Platform.OS === 'web') {
-      dbLog.debug('Saving drawing to web storage', { date, pathCount: drawingData.length });
-      return webDatabaseService.saveDrawing(date, drawingData);
-    }
-
-    if (!this.db) {
-      await this.initDatabase();
-    }
-
-    try {
-      const dataString = JSON.stringify(drawingData);
-      dbLog.debug('Saving drawing to SQLite', {
-        date,
-        pathCount: drawingData.length,
-        dataSize: dataString.length,
-      });
-
-      await this.db!.runAsync(
-        `INSERT OR REPLACE INTO drawings (date, data, updated_at)
-         VALUES (?, ?, CURRENT_TIMESTAMP)`,
-        [date, dataString]
+    const SQLite = await import('expo-sqlite');
+    this.db = await SQLite.openDatabaseAsync('journal.db');
+    await this.db.execAsync(`
+      CREATE TABLE IF NOT EXISTS drawings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT UNIQUE NOT NULL,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
-
-      dbLog.info('Drawing saved successfully', { date });
-    } catch (error) {
-      dbLog.error('Error saving drawing:', { date, error });
-      throw error;
-    }
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        journal_type TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(date, journal_type)
+      );
+      INSERT OR IGNORE INTO journal_entries (date, journal_type, data, created_at, updated_at)
+      SELECT date, 'daily-diary', data, created_at, updated_at FROM drawings;
+    `);
+    dbLog.info('Database initialized successfully');
   }
 
-  async loadDrawing(date: string): Promise<any[]> {
-    // Use web service for web platform
+  async createJournalEntry(date: string, journalType: JournalTypeId): Promise<void> {
     if (Platform.OS === 'web') {
-      dbLog.debug('Loading drawing from web storage', { date });
-      return webDatabaseService.loadDrawing(date);
+      return webDatabaseService.createJournalEntry(date, journalType);
     }
-
-    if (!this.db) {
-      await this.initDatabase();
-    }
-
-    try {
-      dbLog.debug('Loading drawing from SQLite', { date });
-      const result = (await this.db!.getFirstAsync(`SELECT data FROM drawings WHERE date = ?`, [
-        date,
-      ])) as { data: string } | null;
-
-      if (result && result.data) {
-        const parsedData = JSON.parse(result.data);
-        dbLog.info('Drawing loaded successfully', { date, pathCount: parsedData.length });
-        return parsedData;
-      }
-
-      dbLog.debug('No drawing found for date', { date });
-      return [];
-    } catch (error) {
-      dbLog.error('Error loading drawing:', { date, error });
-      return [];
-    }
+    if (!this.db) await this.initDatabase();
+    await this.db!.runAsync(
+      'INSERT OR IGNORE INTO journal_entries (date, journal_type, data) VALUES (?, ?, ?)',
+      [date, journalType, JSON.stringify([])]
+    );
   }
 
-  async getAllDrawingDates(): Promise<string[]> {
-    // Use web service for web platform
+  async saveDrawing(
+    date: string,
+    journalType: JournalTypeId,
+    drawingData: unknown[]
+  ): Promise<void> {
     if (Platform.OS === 'web') {
-      return webDatabaseService.getAllDrawingDates();
+      return webDatabaseService.saveDrawing(date, journalType, drawingData);
     }
-
-    if (!this.db) {
-      await this.initDatabase();
-    }
-
-    try {
-      const results = (await this.db!.getAllAsync(
-        `SELECT date FROM drawings ORDER BY date DESC`
-      )) as { date: string }[];
-
-      return results.map((row) => row.date);
-    } catch (error) {
-      console.error('Error getting drawing dates:', error);
-      return [];
-    }
+    if (!this.db) await this.initDatabase();
+    await this.db!.runAsync(
+      `INSERT INTO journal_entries (date, journal_type, data, updated_at)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(date, journal_type) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
+      [date, journalType, JSON.stringify(drawingData)]
+    );
   }
 
-  async deleteDrawing(date: string): Promise<void> {
-    // Use web service for web platform
+  async loadDrawing(date: string, journalType: JournalTypeId): Promise<any[]> {
     if (Platform.OS === 'web') {
-      return webDatabaseService.deleteDrawing(date);
+      return webDatabaseService.loadDrawing(date, journalType);
     }
-
-    if (!this.db) {
-      await this.initDatabase();
-    }
-
-    try {
-      await this.db!.runAsync(`DELETE FROM drawings WHERE date = ?`, [date]);
-
-      console.log('Drawing deleted for date:', date);
-    } catch (error) {
-      console.error('Error deleting drawing:', error);
-      throw error;
-    }
+    if (!this.db) await this.initDatabase();
+    const result = (await this.db!.getFirstAsync(
+      'SELECT data FROM journal_entries WHERE date = ? AND journal_type = ?',
+      [date, journalType]
+    )) as { data: string } | null;
+    return result ? (JSON.parse(result.data) as unknown[]) : [];
   }
 
-  async hasDrawing(date: string): Promise<boolean> {
-    // Use web service for web platform
+  async getAllJournalEntries(): Promise<JournalEntry[]> {
     if (Platform.OS === 'web') {
-      return webDatabaseService.hasDrawing(date);
+      return webDatabaseService.getAllJournalEntries();
     }
+    if (!this.db) await this.initDatabase();
+    const results = (await this.db!.getAllAsync(
+      'SELECT date, journal_type FROM journal_entries ORDER BY date DESC'
+    )) as { date: string; journal_type: JournalTypeId }[];
+    return results.map((row) => ({ date: row.date, journalType: row.journal_type }));
+  }
 
-    if (!this.db) {
-      await this.initDatabase();
+  async deleteDrawing(date: string, journalType: JournalTypeId): Promise<void> {
+    if (Platform.OS === 'web') {
+      return webDatabaseService.deleteDrawing(date, journalType);
     }
-
-    try {
-      const result = await this.db!.getFirstAsync(`SELECT 1 FROM drawings WHERE date = ?`, [date]);
-
-      return result !== null;
-    } catch (error) {
-      console.error('Error checking if drawing exists:', error);
-      return false;
-    }
+    if (!this.db) await this.initDatabase();
+    await this.db!.runAsync('DELETE FROM journal_entries WHERE date = ? AND journal_type = ?', [
+      date,
+      journalType,
+    ]);
   }
 }
 
