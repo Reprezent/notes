@@ -8,7 +8,8 @@
     "prebuild": "npm run lint && expo prebuild",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "preview:web": "node scripts/preview-web.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.3",
