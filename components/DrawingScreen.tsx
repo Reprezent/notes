@@ -655,11 +655,18 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
           style={{
             flex: 1,
             borderRadius: 8,
-            shadowColor: palette.sky,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.08,
-            shadowRadius: 16,
-            elevation: 2,
+            ...Platform.select({
+              web: {
+                boxShadow: '0px 8px 16px rgba(79, 141, 247, 0.08)',
+              },
+              default: {
+                shadowColor: palette.sky,
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.08,
+                shadowRadius: 16,
+                elevation: 2,
+              },
+            }),
           }}
           onLayout={handleCanvasLayout}
           {...panResponder.panHandlers}>
@@ -728,24 +735,38 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
 const styles = StyleSheet.create({
   moreMenu: {
-    elevation: 12,
     position: 'absolute',
     right: -73,
-    shadowColor: palette.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
     top: 54,
     width: 190,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
+      },
+      default: {
+        elevation: 12,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   toolOptionsMenu: {
-    elevation: 12,
     left: '50%',
     position: 'absolute',
-    shadowColor: palette.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
     top: 54,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
+      },
+      default: {
+        elevation: 12,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
 });
