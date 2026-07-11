@@ -55,7 +55,8 @@ jobs:
       - name: Rewrite web asset URLs for subpath hosting
         if: github.event_name == 'push' || github.event.action != 'closed'
         run: |
-          node -e "const fs=require('fs');const file='dist/index.html';const html=fs.readFileSync(file,'utf8');const updated=html.replace(/(href|src)=\\\"\\/(?!\\/)/g,'$1=\\\"./');fs.writeFileSync(file,updated);"
+          sed -i -E 's@(href|src)="/@\1="./@g' dist/index.html
+          grep -E '(href|src)="\./' dist/index.html
 
       - name: Checkout gh-pages branch
         run: |
