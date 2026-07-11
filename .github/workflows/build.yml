@@ -32,3 +32,19 @@ jobs:
 
       - name: Export bundle (web)
         run: npx expo export --platform web
+
+      - name: Start web server
+        run: |
+          cd dist
+          npx http-server -p 8080 -g &
+          sleep 2
+          echo "✓ Web server running at http://localhost:8080"
+        if: always()
+
+      - name: Upload bundle as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle
+          path: dist/
+          retention-days: 7
+        if: always()

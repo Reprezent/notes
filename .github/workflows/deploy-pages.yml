@@ -1,0 +1,96 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build web bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine deployment path
+        id: path
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "base-path=/pr-${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
+          else
+            echo "base-path=/" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Export bundle (web)
+        env:
+          EXPO_BASE_PATH: ${{ steps.path.outputs.base-path }}
+        run: npx expo export --platform web
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    name: Deploy Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  pr-comment:
+    name: Comment PR with preview URL
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const repo = context.repo;
+            const prNumber = context.issue.number;
+            const owner = repo.owner;
+            const repoName = repo.repo;
+            const previewUrl = `https://${owner}.github.io/${repoName}/pr-${prNumber}/`;
+
+            github.rest.issues.createComment({
+              owner: repo.owner,
+              repo: repo.repo,
+              issue_number: prNumber,
+              body: `🚀 **Preview Ready!**\n\n[View PR Preview](${previewUrl})`
+            });
+
