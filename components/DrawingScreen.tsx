@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -95,20 +95,26 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
   const isPanningRef = useRef(isPanning);
   const lastPanPointRef = useRef(lastPanPoint);
 
-  const loadDrawing = useCallback(async () => {
-    try {
-      drawingLog.info('Loading drawing', { date });
-      const savedPaths = await databaseService.loadDrawing(date);
-      setPaths(savedPaths);
-      drawingLog.debug('Drawing loaded', { date, pathCount: savedPaths.length });
-    } catch (error) {
-      drawingLog.error('Error loading drawing', { date, error });
-    }
-  }, [date]);
-
   useEffect(() => {
-    loadDrawing();
-  }, [loadDrawing]);
+    let cancelled = false;
+
+    drawingLog.info('Loading drawing', { date });
+    databaseService
+      .loadDrawing(date)
+      .then((savedPaths) => {
+        if (!cancelled) {
+          setPaths(savedPaths);
+          drawingLog.debug('Drawing loaded', { date, pathCount: savedPaths.length });
+        }
+      })
+      .catch((error) => {
+        drawingLog.error('Error loading drawing', { date, error });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -119,15 +125,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
     isPanningRef.current = isPanning;
     lastPanPointRef.current = lastPanPoint;
   }, [zoom, panX, panY, canvasWidth, canvasHeight, isPanning, lastPanPoint]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.addEventListener('wheel', handleWheel, { passive: false });
-      return () => {
-        window.removeEventListener('wheel', handleWheel);
-      };
-    }
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -280,6 +277,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
     uiLog.debug('Zoom changed', { oldZoom: currentZoom, newZoom, delta, mouseX, mouseY });
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('wheel', handleWheel, { passive: false });
+      return () => {
+        window.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, []);
+
   const handleCanvasLayout = (event: LayoutChangeEvent) => {
     const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
     if (layoutWidth > 0 && layoutHeight > 0) {
@@ -352,10 +358,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
       if (isRightClick) {
         const pointer = getPointerPosition(event);
         setIsPanning(true);
-        isPanningRef.current = true;
         setIsDrawing(false);
         setLastPanPoint(pointer);
-        lastPanPointRef.current = pointer;
         return;
       }
 
@@ -377,15 +381,14 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
     },
 
     onPanResponderMove: (event) => {
-      if (isPanningRef.current && lastPanPointRef.current) {
+      if (isPanning && lastPanPoint) {
         const currentPoint = getPointerPosition(event);
-        const deltaX = currentPoint.x - lastPanPointRef.current.x;
-        const deltaY = currentPoint.y - lastPanPointRef.current.y;
+        const deltaX = currentPoint.x - lastPanPoint.x;
+        const deltaY = currentPoint.y - lastPanPoint.y;
 
         setPanX((prev) => prev + deltaX);
         setPanY((prev) => prev + deltaY);
         setLastPanPoint(currentPoint);
-        lastPanPointRef.current = currentPoint;
         return;
       }
 
@@ -405,11 +408,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
     },
 
     onPanResponderRelease: () => {
-      if (isPanningRef.current) {
+      if (isPanning) {
         setIsPanning(false);
-        isPanningRef.current = false;
         setLastPanPoint(null);
-        lastPanPointRef.current = null;
         return;
       }
 
@@ -435,9 +436,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, onBack }) =>
 
     onPanResponderTerminate: () => {
       setIsPanning(false);
-      isPanningRef.current = false;
       setLastPanPoint(null);
-      lastPanPointRef.current = null;
       setIsDrawing(false);
       setCurrentPath('');
       setCurrentPoints([]);
