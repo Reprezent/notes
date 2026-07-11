@@ -52,11 +52,26 @@ jobs:
           EXPO_BASE_PATH: ${{ github.event_name == 'pull_request' && format('/pr-{0}/', github.event.pull_request.number) || '/' }}
         run: npx expo export --platform web
 
-      - name: Rewrite web asset URLs for subpath hosting
+      - name: Rewrite bundle URLs for subpath hosting
         if: github.event_name == 'push' || github.event.action != 'closed'
         run: |
-          sed -i -E 's@(href|src)="/@\1="./@g' dist/index.html
-          grep -E '(href|src)="\./' dist/index.html
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="/${{ github.event.repository.name }}/pr-${{ github.event.pull_request.number }}/"
+          else
+            base="/${{ github.event.repository.name }}/"
+          fi
+
+          find dist -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' \) \
+            -exec sed -i \
+              -e "s@/assets/@${base}assets/@g" \
+              -e "s@/_expo/@${base}_expo/@g" \
+              -e "s@/favicon.ico@${base}favicon.ico@g" {} +
+
+          if grep -R -E '["'\'']/(assets|_expo|favicon\.ico)' dist \
+            --include='*.html' --include='*.css' --include='*.js'; then
+            echo "Root-relative bundle URL remains after rewrite."
+            exit 1
+          fi
 
       - name: Checkout gh-pages branch
         run: |
