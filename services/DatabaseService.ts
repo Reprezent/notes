@@ -52,11 +52,7 @@ class DatabaseService {
     );
   }
 
-  async saveDrawing(
-    date: string,
-    journalType: JournalTypeId,
-    drawingData: unknown
-  ): Promise<void> {
+  async saveDrawing(date: string, journalType: JournalTypeId, drawingData: unknown): Promise<void> {
     if (Platform.OS === 'web') {
       return webDatabaseService.saveDrawing(date, journalType, drawingData);
     }

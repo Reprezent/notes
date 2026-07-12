@@ -590,7 +590,10 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       if (Platform.OS !== 'web') {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permissionResult.granted) {
-          Alert.alert('Permission required', 'Photo library permission is required to import images.');
+          Alert.alert(
+            'Permission required',
+            'Photo library permission is required to import images.'
+          );
           return;
         }
       }

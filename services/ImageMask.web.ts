@@ -78,8 +78,7 @@ export async function decodeImageToMask(
   let foregroundPixels = 0;
   for (let index = 0; index < pixels.length; index += 1) {
     const offset = index * 4;
-    const luminance =
-      rgba[offset] * 0.299 + rgba[offset + 1] * 0.587 + rgba[offset + 2] * 0.114;
+    const luminance = rgba[offset] * 0.299 + rgba[offset + 1] * 0.587 + rgba[offset + 2] * 0.114;
     pixels[index] = rgba[offset + 3] >= 16 && luminance <= settings.threshold ? 1 : 0;
     foregroundPixels += pixels[index];
   }
