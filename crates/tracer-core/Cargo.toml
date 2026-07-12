@@ -12,3 +12,6 @@ path = "src/lib.rs"
 serde.workspace = true
 visioncortex = "=0.8.8"
 vtracer = "=0.6.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+instant = { version = "=0.1.13", features = ["wasm-bindgen"] }
