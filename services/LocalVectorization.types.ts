@@ -2,6 +2,7 @@ export const TRACE_CORE_VERSION = '0.1.0';
 export const MAX_TRACE_WIDTH = 4_096;
 export const MAX_TRACE_HEIGHT = 4_096;
 export const MAX_TRACE_PIXELS = 16_777_216;
+export const MAX_TRACE_WORKING_DIMENSION = 1_536;
 export const MAX_TRACE_PATHS = 16_384;
 export const MAX_TRACE_OUTPUT_BYTES = 4 * 1024 * 1024;
 

@@ -10,6 +10,7 @@ import {
   assertValidTraceMaskRequest,
   completedResponseFromUnknown,
   LocalTraceError,
+  MAX_TRACE_WORKING_DIMENSION,
   type LocalVectorizationServiceContract,
   type TraceMaskRequest,
   type TurnPolicy,
@@ -49,22 +50,51 @@ function errorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function resizeMaskForWeb(request: TraceMaskRequest): TraceMaskRequest {
+  const scale = Math.min(
+    1,
+    MAX_TRACE_WORKING_DIMENSION / Math.max(request.width, request.height)
+  );
+  if (scale === 1) {
+    return request;
+  }
+
+  const width = Math.max(1, Math.round(request.width * scale));
+  const height = Math.max(1, Math.round(request.height * scale));
+  const pixels = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = Math.min(request.height - 1, Math.floor(y / scale));
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = Math.min(request.width - 1, Math.floor(x / scale));
+      pixels[y * width + x] = request.pixels[sourceY * request.width + sourceX];
+    }
+  }
+  return { ...request, pixels, width, height };
+}
+
 export const localVectorizationService: LocalVectorizationServiceContract = {
   async traceMask(request: TraceMaskRequest) {
+    const effectiveRequest = resizeMaskForWeb(request);
     const startedAt = Date.now();
     vectorizationLog.info('Starting web mask trace', {
-      width: request.width,
-      height: request.height,
-      maskBytes: request.pixels.byteLength,
-      settings: request.settings,
+      width: effectiveRequest.width,
+      height: effectiveRequest.height,
+      sourceWidth: request.width,
+      sourceHeight: request.height,
+      maskBytes: effectiveRequest.pixels.byteLength,
+      settings: effectiveRequest.settings,
     });
     try {
-      assertValidTraceMaskRequest(request);
+      assertValidTraceMaskRequest(effectiveRequest);
       vectorizationLog.debug('Web trace request validated');
       await loadWasm();
-      const { settings } = request;
+      const { settings } = effectiveRequest;
       const engineStartedAt = Date.now();
-      const result: unknown = traceMask(request.pixels, request.width, request.height, {
+      const result: unknown = traceMask(
+        effectiveRequest.pixels,
+        effectiveRequest.width,
+        effectiveRequest.height,
+        {
         threshold: settings.threshold,
         sensitivity: settings.sensitivity,
         speckleMinArea: settings.speckleMinArea,
@@ -73,14 +103,15 @@ export const localVectorizationService: LocalVectorizationServiceContract = {
         optimizeCurve: settings.optimizeCurve,
         maxPathCount: settings.maxPathCount,
         maxOutputBytes: settings.maxOutputBytes,
-      });
+        }
+      );
       vectorizationLog.info('WASM trace engine completed', {
         elapsedMs: Date.now() - engineStartedAt,
       });
       const response = completedResponseFromUnknown(
         result,
         coreVersion(),
-        request.pixels.byteLength
+        effectiveRequest.pixels.byteLength
       );
       vectorizationLog.info('Web trace response validated', {
         diagnostics: response.diagnostics,
@@ -92,9 +123,9 @@ export const localVectorizationService: LocalVectorizationServiceContract = {
       const code = errorCode(error);
       vectorizationLog.error('Web mask trace failed', {
         code,
-        width: request.width,
-        height: request.height,
-        maskBytes: request.pixels.byteLength,
+        width: effectiveRequest.width,
+        height: effectiveRequest.height,
+        maskBytes: effectiveRequest.pixels.byteLength,
         elapsedMs: Date.now() - startedAt,
         error,
       });

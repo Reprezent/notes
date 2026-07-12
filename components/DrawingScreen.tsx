@@ -433,6 +433,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   };
 
   const handleCameraAction = () => {
+    console.info('[VECTORIZE] Vectorize image pressed');
     setIsMoreMenuOpen(false);
     void importAndVectorizeImage();
   };
@@ -578,9 +579,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
   const importAndVectorizeImage = async () => {
     if (isVectorizing) {
+      console.warn('[VECTORIZE] Vectorization request ignored because one is already running');
       return;
     }
 
+    console.info('[VECTORIZE] Starting image picker');
+    drawingLog.info('Starting image vectorization', { date, platform: Platform.OS });
     setIsVectorizing(true);
     try {
       if (Platform.OS !== 'web') {
@@ -592,17 +596,31 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 1,
         base64: true,
       });
 
       if (result.canceled) {
+        drawingLog.info('Image picker canceled', { date });
         return;
       }
 
       const asset = result.assets[0];
+      if (!asset) {
+        throw new Error('No image was returned by the image picker.');
+      }
+      drawingLog.info('Image selected for vectorization', {
+        date,
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+      });
+      console.info('[VECTORIZE] Image selected', {
+        width: asset.width,
+        height: asset.height,
+        hasBase64: Boolean(asset.base64),
+      });
       let base64 = asset.base64;
       if (!base64 && Platform.OS === 'web') {
         const imageResponse = await fetch(asset.uri);
@@ -631,9 +649,18 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       }
 
       const request = await decodeImageToMask(base64, defaultTraceSettings, asset.mimeType);
+      console.info('[VECTORIZE] Binary mask ready', {
+        width: request.width,
+        height: request.height,
+        bytes: request.pixels.byteLength,
+      });
       const response = await LocalVectorizationService.traceMask({
         ...request,
         settings: defaultTraceSettings,
+      });
+      console.info('[VECTORIZE] WASM trace completed', {
+        kind: response.kind,
+        pathCount: response.kind === 'completed' ? response.paths.length : 0,
       });
 
       if (response.kind !== 'completed') {
@@ -745,6 +772,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               <View className="border border-line bg-paper p-2" style={styles.moreMenu}>
                 <TouchableOpacity
                   onPress={handleCameraAction}
+                  onPressIn={() => console.info('[VECTORIZE] Vectorize menu item pressed')}
                   disabled={isVectorizing}
                   className="flex-row items-center rounded-lg px-3 py-3">
                   <Ionicons name="camera-outline" size={20} color={palette.sky} />

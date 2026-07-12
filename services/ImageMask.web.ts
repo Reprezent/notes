@@ -2,6 +2,7 @@ import {
   MAX_TRACE_HEIGHT,
   MAX_TRACE_PIXELS,
   MAX_TRACE_WIDTH,
+  MAX_TRACE_WORKING_DIMENSION,
   type TraceSettings,
 } from './LocalVectorization.types';
 import type { DecodedImageMask } from './ImageMask';
@@ -53,18 +54,27 @@ export async function decodeImageToMask(
     throw new Error('The selected image is too large to vectorize.');
   }
 
+  const scale = Math.min(1, MAX_TRACE_WORKING_DIMENSION / Math.max(width, height));
+  const maskWidth = Math.max(1, Math.round(width * scale));
+  const maskHeight = Math.max(1, Math.round(height * scale));
+  const maskPixelCount = maskWidth * maskHeight;
   const maskStartedAt = Date.now();
-  vectorizationLog.debug('Reading web image pixels', { width, height });
+  vectorizationLog.debug('Reading web image pixels', {
+    width: maskWidth,
+    height: maskHeight,
+    sourceWidth: width,
+    sourceHeight: height,
+  });
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = maskWidth;
+  canvas.height = maskHeight;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) {
     throw new Error('Image pixel decoding is unavailable.');
   }
-  context.drawImage(image, 0, 0);
-  const rgba = context.getImageData(0, 0, width, height).data;
-  const pixels = new Uint8Array(pixelCount);
+  context.drawImage(image, 0, 0, maskWidth, maskHeight);
+  const rgba = context.getImageData(0, 0, maskWidth, maskHeight).data;
+  const pixels = new Uint8Array(maskPixelCount);
   let foregroundPixels = 0;
   for (let index = 0; index < pixels.length; index += 1) {
     const offset = index * 4;
@@ -74,13 +84,15 @@ export async function decodeImageToMask(
     foregroundPixels += pixels[index];
   }
   vectorizationLog.info('Web binary mask prepared', {
-    width,
-    height,
+    width: maskWidth,
+    height: maskHeight,
+    sourceWidth: width,
+    sourceHeight: height,
     maskBytes: pixels.byteLength,
     foregroundPixels,
-    foregroundPercent: Number(((foregroundPixels / pixelCount) * 100).toFixed(2)),
+    foregroundPercent: Number(((foregroundPixels / maskPixelCount) * 100).toFixed(2)),
     thresholdElapsedMs: Date.now() - maskStartedAt,
     totalElapsedMs: Date.now() - startedAt,
   });
-  return { pixels, width, height };
+  return { pixels, width: maskWidth, height: maskHeight };
 }
