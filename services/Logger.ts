@@ -26,6 +26,13 @@ export const drawingLog = {
   error: (msg: string, ...args: any[]) => log.error(`[DRAWING] ${msg}`, ...args),
 };
 
+export const vectorizationLog = {
+  debug: (msg: string, ...args: any[]) => log.debug(`[VECTORIZE] ${msg}`, ...args),
+  info: (msg: string, ...args: any[]) => log.info(`[VECTORIZE] ${msg}`, ...args),
+  warn: (msg: string, ...args: any[]) => log.warn(`[VECTORIZE] ${msg}`, ...args),
+  error: (msg: string, ...args: any[]) => log.error(`[VECTORIZE] ${msg}`, ...args),
+};
+
 export const uiLog = {
   debug: (msg: string, ...args: any[]) => log.debug(`[UI] ${msg}`, ...args),
   info: (msg: string, ...args: any[]) => log.info(`[UI] ${msg}`, ...args),
