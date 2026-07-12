@@ -65,7 +65,7 @@ class WebDatabaseService {
     }
   }
 
-  async saveDrawing(date: string, journalType: JournalTypeId, drawingData: any[]): Promise<void> {
+  async saveDrawing(date: string, journalType: JournalTypeId, drawingData: unknown): Promise<void> {
     try {
       const key = this.getStorageKey(date, journalType);
       const existingJournal = await AsyncStorage.getItem(key);
@@ -92,7 +92,7 @@ class WebDatabaseService {
     }
   }
 
-  async loadDrawing(date: string, journalType: JournalTypeId): Promise<any[]> {
+  async loadDrawing(date: string, journalType: JournalTypeId): Promise<unknown> {
     try {
       const key = this.getStorageKey(date, journalType);
       const result = await AsyncStorage.getItem(key);

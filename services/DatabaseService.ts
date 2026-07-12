@@ -52,11 +52,7 @@ class DatabaseService {
     );
   }
 
-  async saveDrawing(
-    date: string,
-    journalType: JournalTypeId,
-    drawingData: unknown[]
-  ): Promise<void> {
+  async saveDrawing(date: string, journalType: JournalTypeId, drawingData: unknown): Promise<void> {
     if (Platform.OS === 'web') {
       return webDatabaseService.saveDrawing(date, journalType, drawingData);
     }
@@ -69,7 +65,7 @@ class DatabaseService {
     );
   }
 
-  async loadDrawing(date: string, journalType: JournalTypeId): Promise<any[]> {
+  async loadDrawing(date: string, journalType: JournalTypeId): Promise<unknown> {
     if (Platform.OS === 'web') {
       return webDatabaseService.loadDrawing(date, journalType);
     }
@@ -78,7 +74,7 @@ class DatabaseService {
       'SELECT data FROM journal_entries WHERE date = ? AND journal_type = ?',
       [date, journalType]
     )) as { data: string } | null;
-    return result ? (JSON.parse(result.data) as unknown[]) : [];
+    return result ? (JSON.parse(result.data) as unknown) : [];
   }
 
   async getAllJournalEntries(): Promise<JournalEntry[]> {

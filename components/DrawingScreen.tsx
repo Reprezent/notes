@@ -15,7 +15,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { databaseService } from '../services/DatabaseService';
 import { getJournalType, JournalTypeId } from '../services/JournalTypes';
-import { drawingLog, uiLog } from '../services/Logger';
+import { LocalVectorizationService } from '../services/LocalVectorizationService';
+import {
+  MAX_TRACE_OUTPUT_BYTES,
+  MAX_TRACE_PATHS,
+  type CompletedVectorizationResponse,
+  LocalTraceError,
+  type TraceSettings,
+} from '../services/LocalVectorization.types';
+import { decodeImageToMask } from '../services/ImageMask';
+import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
 import { drawingColors, palette } from './theme';
 
 // Smooth a path using quadratic curves
@@ -64,9 +73,94 @@ interface DrawingPath {
   path: string;
   color: string;
   strokeWidth: number;
+  fillColor?: string;
+  fillRule?: 'evenodd' | 'nonzero';
+  transform?: string;
+}
+
+interface PersistedDrawing {
+  paths: DrawingPath[];
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const defaultTraceSettings: TraceSettings = {
+  threshold: 180,
+  sensitivity: 50,
+  speckleMinArea: 8,
+  turnPolicy: 'minority',
+  cornerThreshold: 0.2,
+  optimizeCurve: true,
+  maxPathCount: MAX_TRACE_PATHS,
+  maxOutputBytes: MAX_TRACE_OUTPUT_BYTES,
+};
+
+const isDrawingPath = (value: unknown): value is DrawingPath => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.path === 'string' &&
+    typeof candidate.color === 'string' &&
+    typeof candidate.strokeWidth === 'number' &&
+    (candidate.fillColor === undefined || typeof candidate.fillColor === 'string') &&
+    (candidate.fillRule === undefined ||
+      candidate.fillRule === 'evenodd' ||
+      candidate.fillRule === 'nonzero') &&
+    (candidate.transform === undefined || typeof candidate.transform === 'string')
+  );
+};
+
+const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
+  if (Array.isArray(value)) {
+    return {
+      paths: value.filter(isDrawingPath),
+    };
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return { paths: [] };
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return {
+    paths: Array.isArray(candidate.paths) ? candidate.paths.filter(isDrawingPath) : [],
+  };
+};
+
+const fitViewBoxToCanvas = (
+  viewBox: readonly [number, number, number, number],
+  canvasWidth: number,
+  canvasHeight: number
+): string | undefined => {
+  const [x, y, width, height] = viewBox;
+  if (width <= 0 || height <= 0 || canvasWidth <= 0 || canvasHeight <= 0) {
+    return undefined;
+  }
+
+  const scale = Math.min(canvasWidth / width, canvasHeight / height);
+  const offsetX = (canvasWidth - width * scale) / 2 - x * scale;
+  const offsetY = (canvasHeight - height * scale) / 2 - y * scale;
+  return `matrix(${scale} 0 0 ${scale} ${offsetX} ${offsetY})`;
+};
+
+const drawingPathsFromVectorization = (
+  response: CompletedVectorizationResponse,
+  color: string,
+  canvasWidth: number,
+  canvasHeight: number
+): DrawingPath[] => {
+  const transform = fitViewBoxToCanvas(response.viewBox, canvasWidth, canvasHeight);
+  return response.paths.map((record) => ({
+    path: record.path,
+    color,
+    strokeWidth: 0,
+    fillColor: color,
+    fillRule: record.fillRule,
+    transform,
+  }));
+};
 
 export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType, onBack }) => {
   const [paths, setPaths] = useState<DrawingPath[]>([]);
@@ -77,6 +171,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [activeToolOptions, setActiveToolOptions] = useState<'pen' | 'eraser' | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isVectorizing, setIsVectorizing] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
@@ -103,10 +198,14 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     drawingLog.info('Loading drawing', { date });
     databaseService
       .loadDrawing(date, journalType)
-      .then((savedPaths) => {
+      .then((savedDrawing) => {
         if (!cancelled) {
-          setPaths(savedPaths);
-          drawingLog.debug('Drawing loaded', { date, pathCount: savedPaths.length });
+          const normalizedDrawing = normalizePersistedDrawing(savedDrawing);
+          setPaths(normalizedDrawing.paths);
+          drawingLog.debug('Drawing loaded', {
+            date,
+            pathCount: normalizedDrawing.paths.length,
+          });
         }
       })
       .catch((error) => {
@@ -334,8 +433,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   };
 
   const handleCameraAction = () => {
+    vectorizationLog.info('Vectorize image pressed');
     setIsMoreMenuOpen(false);
-    takePicture();
+    void importAndVectorizeImage();
   };
 
   const handleResetZoomAction = () => {
@@ -477,24 +577,126 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     ]);
   };
 
-  const takePicture = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission required', 'Camera permission is required to take pictures.');
+  const importAndVectorizeImage = async () => {
+    if (isVectorizing) {
+      vectorizationLog.warn('Vectorization request ignored because one is already running');
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    vectorizationLog.info('Starting image picker');
+    drawingLog.info('Starting image vectorization', { date, platform: Platform.OS });
+    setIsVectorizing(true);
+    try {
+      if (Platform.OS !== 'web') {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          Alert.alert(
+            'Permission required',
+            'Photo library permission is required to import images.'
+          );
+          return;
+        }
+      }
 
-    if (!result.canceled) {
-      // TODO: Handle image insertion into drawing
-      console.log('Image captured:', result.assets[0].uri);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 1,
+        base64: true,
+      });
+
+      if (result.canceled) {
+        drawingLog.info('Image picker canceled', { date });
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset) {
+        throw new Error('No image was returned by the image picker.');
+      }
+      drawingLog.info('Image selected for vectorization', {
+        date,
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+      });
+      vectorizationLog.info('Image selected', {
+        width: asset.width,
+        height: asset.height,
+        hasBase64: Boolean(asset.base64),
+      });
+      let base64 = asset.base64;
+      if (!base64 && Platform.OS === 'web') {
+        const imageResponse = await fetch(asset.uri);
+        if (!imageResponse.ok) {
+          throw new Error(`Image download failed with status ${imageResponse.status}.`);
+        }
+        const blob = await imageResponse.blob();
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const value = reader.result;
+            if (typeof value !== 'string') {
+              reject(new Error('Image data could not be read.'));
+              return;
+            }
+            const separator = value.indexOf(',');
+            resolve(separator >= 0 ? value.slice(separator + 1) : value);
+          };
+          reader.onerror = () => reject(new Error('Image data could not be read.'));
+          reader.readAsDataURL(blob);
+        });
+      }
+      if (!base64) {
+        drawingLog.error('Selected image is missing base64 content', { date, uri: asset.uri });
+        throw new Error('The selected image could not be read for vectorization.');
+      }
+
+      const request = await decodeImageToMask(base64, defaultTraceSettings, asset.mimeType);
+      vectorizationLog.info('Binary mask ready', {
+        width: request.width,
+        height: request.height,
+        bytes: request.pixels.byteLength,
+      });
+      const response = await LocalVectorizationService.traceMask({
+        ...request,
+        settings: defaultTraceSettings,
+      });
+      vectorizationLog.info('WASM trace completed', {
+        kind: response.kind,
+        pathCount: response.kind === 'completed' ? response.paths.length : 0,
+      });
+
+      if (response.kind !== 'completed') {
+        Alert.alert('Vectorization unavailable', 'Local vectorization is not available yet.');
+        return;
+      }
+
+      const tracedPaths = drawingPathsFromVectorization(
+        response,
+        selectedColor,
+        canvasWidthRef.current,
+        canvasHeightRef.current
+      );
+      const newPaths = [...paths, ...tracedPaths];
+      setPaths(newPaths);
+      await saveDrawing(newPaths);
+      drawingLog.info('Imported image vectorized successfully', {
+        date,
+        pathCount: tracedPaths.length,
+        width: request.width,
+        height: request.height,
+      });
+    } catch (error) {
+      drawingLog.error('Image vectorization failed', { date, error });
+      const message =
+        error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
+          ? 'The selected image is too large to vectorize on this device.'
+          : error instanceof Error
+            ? error.message
+            : 'The selected image could not be vectorized.';
+      Alert.alert('Vectorization failed', message);
+    } finally {
+      setIsVectorizing(false);
     }
   };
 
@@ -573,9 +775,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               <View className="border border-line bg-paper p-2" style={styles.moreMenu}>
                 <TouchableOpacity
                   onPress={handleCameraAction}
+                  onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
+                  disabled={isVectorizing}
                   className="flex-row items-center rounded-lg px-3 py-3">
                   <Ionicons name="camera-outline" size={20} color={palette.sky} />
-                  <Text className="ml-3 text-sm font-bold text-ink">Camera</Text>
+                  <Text className="ml-3 text-sm font-bold text-ink">
+                    {isVectorizing ? 'Processing image...' : 'Camera'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleResetZoomAction}
@@ -698,11 +904,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               <Path
                 key={index}
                 d={drawingPath.path}
-                stroke={drawingPath.color}
+                stroke={drawingPath.fillColor ? 'none' : drawingPath.color}
                 strokeWidth={drawingPath.strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                fill="none"
+                fill={drawingPath.fillColor ?? 'none'}
+                fillRule={drawingPath.fillRule}
+                transform={drawingPath.transform}
                 vectorEffect="non-scaling-stroke"
               />
             ))}

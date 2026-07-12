@@ -5,7 +5,7 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   ...fixupConfigRules(expoConfig),
   {
-    ignores: ['dist/*'],
+    ignores: ['dist/*', 'modules/expo-local-vectorizer/artifacts/**'],
   },
   {
     rules: {

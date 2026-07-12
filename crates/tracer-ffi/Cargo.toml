@@ -1,0 +1,13 @@
+[package]
+name = "tracer-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "tracer_ffi"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde_json = "1.0"
+tracer-core = { path = "../tracer-core" }

@@ -6,6 +6,7 @@ import { DrawingScreen } from 'components/DrawingScreen';
 import { databaseService } from 'services/DatabaseService';
 import { JournalTypeId } from 'services/JournalTypes';
 import { log } from 'services/Logger';
+import 'services/LocalVectorizationBundle';
 
 import './tailwind.css';
 
