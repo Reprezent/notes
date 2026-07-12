@@ -18,5 +18,8 @@
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    "cargo xtask": true
   }
 }
