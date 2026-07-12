@@ -1,5 +1,8 @@
 declare module '*artifacts/web/trace.js' {
-  export default function initializeWasm(): Promise<unknown>;
+  interface WasmModule {
+    memory: WebAssembly.Memory;
+  }
+  export default function initializeWasm(wasmUrl?: string): Promise<WasmModule>;
   export function coreVersion(): string;
   export function traceMask(
     pixels: Uint8Array,
