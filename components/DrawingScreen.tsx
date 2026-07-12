@@ -24,7 +24,7 @@ import {
   type TraceSettings,
 } from '../services/LocalVectorization.types';
 import { decodeImageToMask } from '../services/ImageMask';
-import { drawingLog, uiLog } from '../services/Logger';
+import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
 import { drawingColors, palette } from './theme';
 
 // Smooth a path using quadratic curves
@@ -433,7 +433,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   };
 
   const handleCameraAction = () => {
-    console.info('[VECTORIZE] Vectorize image pressed');
+    vectorizationLog.info('Vectorize image pressed');
     setIsMoreMenuOpen(false);
     void importAndVectorizeImage();
   };
@@ -579,11 +579,11 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
   const importAndVectorizeImage = async () => {
     if (isVectorizing) {
-      console.warn('[VECTORIZE] Vectorization request ignored because one is already running');
+      vectorizationLog.warn('Vectorization request ignored because one is already running');
       return;
     }
 
-    console.info('[VECTORIZE] Starting image picker');
+    vectorizationLog.info('Starting image picker');
     drawingLog.info('Starting image vectorization', { date, platform: Platform.OS });
     setIsVectorizing(true);
     try {
@@ -616,7 +616,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         uri: asset.uri,
         mimeType: asset.mimeType,
       });
-      console.info('[VECTORIZE] Image selected', {
+      vectorizationLog.info('Image selected', {
         width: asset.width,
         height: asset.height,
         hasBase64: Boolean(asset.base64),
@@ -649,7 +649,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
       }
 
       const request = await decodeImageToMask(base64, defaultTraceSettings, asset.mimeType);
-      console.info('[VECTORIZE] Binary mask ready', {
+      vectorizationLog.info('Binary mask ready', {
         width: request.width,
         height: request.height,
         bytes: request.pixels.byteLength,
@@ -658,7 +658,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         ...request,
         settings: defaultTraceSettings,
       });
-      console.info('[VECTORIZE] WASM trace completed', {
+      vectorizationLog.info('WASM trace completed', {
         kind: response.kind,
         pathCount: response.kind === 'completed' ? response.paths.length : 0,
       });
@@ -772,7 +772,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               <View className="border border-line bg-paper p-2" style={styles.moreMenu}>
                 <TouchableOpacity
                   onPress={handleCameraAction}
-                  onPressIn={() => console.info('[VECTORIZE] Vectorize menu item pressed')}
+                  onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
                   disabled={isVectorizing}
                   className="flex-row items-center rounded-lg px-3 py-3">
                   <Ionicons name="camera-outline" size={20} color={palette.sky} />
