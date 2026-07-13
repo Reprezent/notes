@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -134,7 +134,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
     onValueChangeRef.current = onValueChange;
   }, [value, minimum, maximum, step, onValueChange]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPanResponder(
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
