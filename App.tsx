@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppShell } from 'components/AppShell';
 import { HomeScreen } from 'components/HomeScreen';
 import { DrawingScreen } from 'components/DrawingScreen';
+import { ThemeProvider } from 'components/theme';
 import { databaseService } from 'services/DatabaseService';
 import { JournalTypeId } from 'services/JournalTypes';
 import { log } from 'services/Logger';
@@ -40,21 +41,23 @@ export default function App() {
   };
 
   return (
-    <AppShell menuItems={[]}>
-      {() => (
-        <>
-          {currentScreen === 'home' ? (
-            <HomeScreen key={homeKey} onJournalSelect={handleJournalSelect} />
-          ) : selectedJournal ? (
-            <DrawingScreen
-              date={selectedJournal.date}
-              journalType={selectedJournal.journalType}
-              onBack={handleBackToHome}
-            />
-          ) : null}
-          <StatusBar style="dark" />
-        </>
-      )}
-    </AppShell>
+    <ThemeProvider>
+      <AppShell menuItems={[]}>
+        {() => (
+          <>
+            {currentScreen === 'home' ? (
+              <HomeScreen key={homeKey} onJournalSelect={handleJournalSelect} />
+            ) : selectedJournal ? (
+              <DrawingScreen
+                date={selectedJournal.date}
+                journalType={selectedJournal.journalType}
+                onBack={handleBackToHome}
+              />
+            ) : null}
+            <StatusBar style="dark" />
+          </>
+        )}
+      </AppShell>
+    </ThemeProvider>
   );
 }

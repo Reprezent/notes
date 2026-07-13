@@ -25,7 +25,7 @@ import {
 } from '../services/LocalVectorization.types';
 import { decodeImageToMask } from '../services/ImageMask';
 import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
-import { drawingColors, palette } from './theme';
+import { Palette, useTheme } from './theme';
 
 // Smooth a path using quadratic curves
 const smoothPath = (points: { x: number; y: number }[]): string => {
@@ -163,6 +163,8 @@ const drawingPathsFromVectorization = (
 };
 
 export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType, onBack }) => {
+  const { drawingColors, palette } = useTheme();
+  const styles = createStyles(palette);
   const [paths, setPaths] = useState<DrawingPath[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
@@ -721,14 +723,17 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   );
 
   return (
-    <View className="flex-1 bg-canvas">
-      <View className="border-b border-line bg-paper px-4 py-3" style={{ zIndex: 10 }}>
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <View
+      className="border-b px-4 py-3"
+      style={{ backgroundColor: palette.paper, borderBottomColor: palette.border, zIndex: 10 }}>
         <View className="flex-row items-center">
           <View className="flex-1 flex-row items-center pr-2">
             <TouchableOpacity
               onPress={onBack}
-              className="mr-3 h-11 w-11 items-center justify-center rounded-lg bg-sky-soft">
-              <Ionicons name="arrow-back" size={23} color={palette.sky} />
+              className="mr-3 h-11 w-11 items-center justify-center rounded-lg"
+              style={{ backgroundColor: palette.tealSoft }}>
+              <Ionicons name="arrow-back" size={23} color={palette.teal} />
             </TouchableOpacity>
             <View className="flex-1">
               <Text className="text-base font-bold text-ink" numberOfLines={1}>
@@ -740,12 +745,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             </View>
           </View>
 
-          <View className="flex-row rounded-lg bg-canvas p-1" style={{ position: 'relative' }}>
+          <View
+            className="flex-row rounded-lg p-1"
+            style={{ backgroundColor: palette.background, position: 'relative' }}>
             <TouchableOpacity
               onPress={() => handleToolSelect('pen')}
-              className={`mr-1 h-11 w-11 items-center justify-center rounded-lg ${
-                selectedTool === 'pen' ? 'bg-teal' : 'bg-transparent'
-              }`}>
+              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
+              style={{ backgroundColor: selectedTool === 'pen' ? palette.teal : 'transparent' }}>
               <Ionicons
                 name="pencil-outline"
                 size={22}
@@ -754,9 +760,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleToolSelect('eraser')}
-              className={`mr-1 h-11 w-11 items-center justify-center rounded-lg ${
-                selectedTool === 'eraser' ? 'bg-lavender' : 'bg-transparent'
-              }`}>
+              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
+              style={{ backgroundColor: selectedTool === 'eraser' ? palette.teal : 'transparent' }}>
               <Ionicons
                 name="remove-circle-outline"
                 size={22}
@@ -765,20 +770,21 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleMoreToggle}
-              className={`h-11 w-11 items-center justify-center rounded-lg ${
-                isMoreMenuOpen ? 'bg-amber-soft' : 'bg-transparent'
-              }`}>
+              className="h-11 w-11 items-center justify-center rounded-lg"
+              style={{ backgroundColor: isMoreMenuOpen ? palette.tealSoft : 'transparent' }}>
               <Ionicons name="ellipsis-horizontal" size={23} color={palette.muted} />
             </TouchableOpacity>
 
             {isMoreMenuOpen && (
-              <View className="border border-line bg-paper p-2" style={styles.moreMenu}>
+              <View
+                className="border p-2"
+                style={[styles.moreMenu, { backgroundColor: palette.paper, borderColor: palette.border }]}>
                 <TouchableOpacity
                   onPress={handleCameraAction}
                   onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
                   disabled={isVectorizing}
                   className="flex-row items-center rounded-lg px-3 py-3">
-                  <Ionicons name="camera-outline" size={20} color={palette.sky} />
+                  <Ionicons name="camera-outline" size={20} color={palette.teal} />
                   <Text className="ml-3 text-sm font-bold text-ink">
                     {isVectorizing ? 'Processing image...' : 'Camera'}
                   </Text>
@@ -786,7 +792,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 <TouchableOpacity
                   onPress={handleResetZoomAction}
                   className="flex-row items-center rounded-lg px-3 py-3">
-                  <Ionicons name="contract-outline" size={20} color={palette.lavender} />
+                  <Ionicons name="contract-outline" size={20} color={palette.teal} />
                   <Text className="ml-3 text-sm font-bold text-ink">Reset zoom</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -800,10 +806,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
             {activeToolOptions && (
               <View
-                className="border border-line bg-paper p-3"
+                className="border p-3"
                 style={[
                   styles.toolOptionsMenu,
                   {
+                    backgroundColor: palette.paper,
+                    borderColor: palette.border,
                     transform: [{ translateX: -toolOptionsPanelWidth / 2 }],
                     width: toolOptionsPanelWidth,
                   },
@@ -814,10 +822,11 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                       <TouchableOpacity
                         key={color}
                         onPress={() => setSelectedColor(color)}
-                        className={`mb-2 mr-2 h-9 w-9 items-center justify-center rounded-full border-2 ${
-                          selectedColor === color ? 'border-ink' : 'border-line'
-                        }`}
-                        style={{ backgroundColor: color }}>
+                        className="mb-2 mr-2 h-9 w-9 items-center justify-center rounded-full border-2"
+                        style={{
+                          backgroundColor: color,
+                          borderColor: selectedColor === color ? palette.ink : palette.border,
+                        }}>
                         {selectedColor === color && (
                           <Ionicons name="checkmark" size={17} color={palette.surface} />
                         )}
@@ -834,12 +843,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                     <TouchableOpacity
                       key={strokeOption}
                       onPress={() => setStrokeWidth(strokeOption)}
-                      className={`mr-2 h-11 w-11 items-center justify-center rounded-lg ${
-                        strokeWidth === strokeOption ? 'bg-amber-soft' : 'bg-canvas'
-                      }`}>
+                      className="mr-2 h-11 w-11 items-center justify-center rounded-lg"
+                      style={{
+                        backgroundColor:
+                          strokeWidth === strokeOption ? palette.tealSoft : palette.background,
+                      }}>
                       <View
-                        className="rounded-full bg-ink"
+                        className="rounded-full"
                         style={{
+                          backgroundColor: palette.ink,
                           height: strokeOption * 2 + 4,
                           width: strokeOption * 2 + 4,
                         }}
@@ -855,15 +867,17 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         </View>
       </View>
 
-      <View className="flex-1 bg-canvas p-4">
+      <View className="flex-1 p-4" style={{ backgroundColor: palette.background }}>
         <View
-          className="bg-surface overflow-hidden border border-line"
+          className="overflow-hidden border"
           style={{
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
             flex: 1,
             borderRadius: 8,
             ...Platform.select({
               web: {
-                boxShadow: '0px 8px 16px rgba(79, 141, 247, 0.08)',
+                boxShadow: `0px 8px 16px ${palette.teal}14`,
               },
               default: {
                 shadowColor: palette.sky,
@@ -941,7 +955,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) =>
+  StyleSheet.create({
   moreMenu: {
     position: 'absolute',
     right: -73,
@@ -949,7 +964,7 @@ const styles = StyleSheet.create({
     width: 190,
     ...Platform.select({
       web: {
-        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
+        boxShadow: `0px 8px 18px ${palette.ink}24`,
       },
       default: {
         elevation: 12,
@@ -966,7 +981,7 @@ const styles = StyleSheet.create({
     top: 54,
     ...Platform.select({
       web: {
-        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
+        boxShadow: `0px 8px 18px ${palette.ink}24`,
       },
       default: {
         elevation: 12,
@@ -977,4 +992,4 @@ const styles = StyleSheet.create({
       },
     }),
   },
-});
+  });

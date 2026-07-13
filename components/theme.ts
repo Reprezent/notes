@@ -1,7 +1,9 @@
+import React, { createContext, useContext } from 'react';
+
 export const palette = {
   background: '#F5FAF7',
   surface: '#FFFFFF',
-  surfaceWarm: '#FFFDF8',
+  surfaceWarm: '#FAFCFB',
   ink: '#1B3A34',
   muted: '#5B7A73',
   subtle: '#8BA89F',
@@ -10,14 +12,14 @@ export const palette = {
   coralSoft: '#F0D8D0',
   teal: '#2D5F54',
   tealSoft: '#D9E8E3',
-  sky: '#4F8DF7',
-  skySoft: '#E2ECFF',
-  lavender: '#8B6FE8',
-  lavenderSoft: '#EEE8FF',
-  amber: '#C9A961',
-  amberSoft: '#E8DCC4',
-  paper: '#FEFDFB',
-  paperLine: '#E8E3DB',
+  sky: '#3F7A58',
+  skySoft: '#E1EFE5',
+  lavender: '#4D8A63',
+  lavenderSoft: '#E7F2E9',
+  amber: '#6E9B5E',
+  amberSoft: '#EAF2E2',
+  paper: '#FAFCFB',
+  paperLine: '#DFE9E2',
   danger: '#C05A5A',
   disabled: '#C9D7D3',
 };
@@ -34,3 +36,27 @@ export const drawingColors = [
   '#D97745',
   '#6B7280',
 ];
+
+export type Palette = typeof palette;
+
+export interface AppTheme {
+  palette: Palette;
+  drawingColors: readonly string[];
+}
+
+export const defaultTheme: AppTheme = {
+  palette,
+  drawingColors,
+};
+
+const ThemeContext = createContext<AppTheme>(defaultTheme);
+
+export const ThemeProvider = ({
+  children,
+  theme = defaultTheme,
+}: {
+  children: React.ReactNode;
+  theme?: AppTheme;
+}) => <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+
+export const useTheme = () => useContext(ThemeContext);
