@@ -724,9 +724,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-    <View
-      className="border-b px-4 py-3"
-      style={{ backgroundColor: palette.paper, borderBottomColor: palette.border, zIndex: 10 }}>
+      <View
+        className="border-b px-4 py-3"
+        style={{ backgroundColor: palette.paper, borderBottomColor: palette.border, zIndex: 10 }}>
         <View className="flex-row items-center">
           <View className="flex-1 flex-row items-center pr-2">
             <TouchableOpacity
@@ -778,7 +778,10 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             {isMoreMenuOpen && (
               <View
                 className="border p-2"
-                style={[styles.moreMenu, { backgroundColor: palette.paper, borderColor: palette.border }]}>
+                style={[
+                  styles.moreMenu,
+                  { backgroundColor: palette.paper, borderColor: palette.border },
+                ]}>
                 <TouchableOpacity
                   onPress={handleCameraAction}
                   onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
@@ -957,39 +960,39 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
 const createStyles = (palette: Palette) =>
   StyleSheet.create({
-  moreMenu: {
-    position: 'absolute',
-    right: -73,
-    top: 54,
-    width: 190,
-    ...Platform.select({
-      web: {
-        boxShadow: `0px 8px 18px ${palette.ink}24`,
-      },
-      default: {
-        elevation: 12,
-        shadowColor: palette.ink,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
-  toolOptionsMenu: {
-    left: '50%',
-    position: 'absolute',
-    top: 54,
-    ...Platform.select({
-      web: {
-        boxShadow: `0px 8px 18px ${palette.ink}24`,
-      },
-      default: {
-        elevation: 12,
-        shadowColor: palette.ink,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
+    moreMenu: {
+      position: 'absolute',
+      right: -73,
+      top: 54,
+      width: 190,
+      ...Platform.select({
+        web: {
+          boxShadow: `0px 8px 18px ${palette.ink}24`,
+        },
+        default: {
+          elevation: 12,
+          shadowColor: palette.ink,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.14,
+          shadowRadius: 18,
+        },
+      }),
+    },
+    toolOptionsMenu: {
+      left: '50%',
+      position: 'absolute',
+      top: 54,
+      ...Platform.select({
+        web: {
+          boxShadow: `0px 8px 18px ${palette.ink}24`,
+        },
+        default: {
+          elevation: 12,
+          shadowColor: palette.ink,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.14,
+          shadowRadius: 18,
+        },
+      }),
+    },
   });
