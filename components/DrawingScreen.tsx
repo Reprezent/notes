@@ -25,7 +25,7 @@ import {
 } from '../services/LocalVectorization.types';
 import { decodeImageToMask } from '../services/ImageMask';
 import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
-import { Palette, useTheme } from './theme';
+import { Palette, useTheme, withAlpha } from './theme';
 
 // Smooth a path using quadratic curves
 const smoothPath = (points: { x: number; y: number }[]): string => {
@@ -880,7 +880,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             borderRadius: 8,
             ...Platform.select({
               web: {
-                boxShadow: `0px 8px 16px ${palette.teal}14`,
+                boxShadow: `0px 8px 16px ${withAlpha(palette.teal, 0.08)}`,
               },
               default: {
                 shadowColor: palette.teal,
@@ -967,7 +967,7 @@ const createStyles = (palette: Palette) =>
       width: 190,
       ...Platform.select({
         web: {
-          boxShadow: `0px 8px 18px ${palette.ink}24`,
+          boxShadow: `0px 8px 18px ${withAlpha(palette.ink, 0.14)}`,
         },
         default: {
           elevation: 12,
@@ -984,7 +984,7 @@ const createStyles = (palette: Palette) =>
       top: 54,
       ...Platform.select({
         web: {
-          boxShadow: `0px 8px 18px ${palette.ink}24`,
+          boxShadow: `0px 8px 18px ${withAlpha(palette.ink, 0.14)}`,
         },
         default: {
           elevation: 12,
