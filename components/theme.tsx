@@ -1,9 +1,11 @@
 import React, { createContext, useContext } from 'react';
 
+const softWhite = '#FAFCFB';
+
 export const palette = {
   background: '#F5FAF7',
   surface: '#FFFFFF',
-  surfaceSoft: '#FAFCFB',
+  surfaceSoft: softWhite,
   ink: '#1B3A34',
   muted: '#5B7A73',
   subtle: '#8BA89F',
@@ -18,7 +20,7 @@ export const palette = {
   secondarySoft: '#E7F2E9',
   tertiary: '#6E9B5E',
   tertiarySoft: '#EAF2E2',
-  paper: '#FAFCFB',
+  paper: softWhite,
   paperLine: '#DFE9E2',
   danger: '#C05A5A',
   disabled: '#C9D7D3',
