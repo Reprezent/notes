@@ -5,7 +5,7 @@ const softWhite = '#FAFCFB';
 export const palette = {
   background: '#F5FAF7',
   surface: '#FFFFFF',
-  surfaceSoft: softWhite,
+  whiteSoft: softWhite,
   ink: '#1B3A34',
   muted: '#5B7A73',
   subtle: '#8BA89F',

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -164,7 +164,7 @@ const drawingPathsFromVectorization = (
 
 export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType, onBack }) => {
   const { drawingColors, palette } = useTheme();
-  const styles = createStyles(palette);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [paths, setPaths] = useState<DrawingPath[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
