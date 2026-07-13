@@ -883,7 +883,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 boxShadow: `0px 8px 16px ${palette.teal}14`,
               },
               default: {
-                shadowColor: palette.sky,
+                shadowColor: palette.teal,
                 shadowOffset: { width: 0, height: 8 },
                 shadowOpacity: 0.08,
                 shadowRadius: 16,
