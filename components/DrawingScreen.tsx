@@ -115,35 +115,40 @@ const SliderControl: React.FC<SliderControlProps> = ({
   onValueChange,
   formatValue,
 }) => {
-  const [trackWidth, setTrackWidth] = useState(1);
+  const [panResponder, setPanResponder] = useState<ReturnType<typeof PanResponder.create> | null>(null);
   const trackWidthRef = useRef(1);
   const dragStartValueRef = useRef(value);
   const valueRef = useRef(value);
   const minimumRef = useRef(minimum);
   const maximumRef = useRef(maximum);
   const stepRef = useRef(step);
+  const onValueChangeRef = useRef(onValueChange);
 
   useEffect(() => {
     valueRef.current = value;
     minimumRef.current = minimum;
     maximumRef.current = maximum;
     stepRef.current = step;
-  }, [value, minimum, maximum, step]);
+    onValueChangeRef.current = onValueChange;
+  }, [value, minimum, maximum, step, onValueChange]);
 
-  const updateFromLocation = (locationX: number) => {
-    const safeWidth = Math.max(trackWidth, 1);
-    const ratio = clamp(locationX / safeWidth, 0, 1);
-    const nextValue = clamp(roundToStep(minimum + ratio * (maximum - minimum), minimum, step), minimum, maximum);
-    onValueChange(nextValue);
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
+  useEffect(() => {
+    setPanResponder(PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (event) => {
         dragStartValueRef.current = valueRef.current;
-        updateFromLocation(event.nativeEvent.locationX);
+        const safeWidth = Math.max(trackWidthRef.current, 1);
+        const minimumValue = minimumRef.current;
+        const maximumValue = maximumRef.current;
+        const stepValue = stepRef.current;
+        const ratio = clamp(event.nativeEvent.locationX / safeWidth, 0, 1);
+        const nextValue = clamp(
+          roundToStep(minimumValue + ratio * (maximumValue - minimumValue), minimumValue, stepValue),
+          minimumValue,
+          maximumValue
+        );
+        onValueChangeRef.current(nextValue);
       },
       onPanResponderMove: (_event, gestureState) => {
         const safeWidth = Math.max(trackWidthRef.current, 1);
@@ -160,10 +165,10 @@ const SliderControl: React.FC<SliderControlProps> = ({
           minimumValue,
           maximumValue
         );
-        onValueChange(nextValue);
+        onValueChangeRef.current(nextValue);
       },
-    })
-  ).current;
+    }));
+  }, []);
 
   const ratio = (value - minimum) / (maximum - minimum || 1);
   const displayValue = formatValue ? formatValue(value) : String(value);
@@ -178,10 +183,9 @@ const SliderControl: React.FC<SliderControlProps> = ({
         className="h-10 flex-row items-center"
         onLayout={(event) => {
           const width = event.nativeEvent.layout.width;
-          setTrackWidth(width);
           trackWidthRef.current = width;
         }}
-        {...panResponder.panHandlers}>
+        {...panResponder?.panHandlers}>
         <View pointerEvents="none" className="h-2 w-full rounded-full bg-teal-soft">
           <View
             pointerEvents="none"
