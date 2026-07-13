@@ -39,10 +39,10 @@ export const drawingColors = [
   '#6B7280',
 ] as const;
 
-export type Palette = { [Key in keyof typeof palette]: string };
+export type ThemePalette = { [Key in keyof typeof palette]: string };
 
 export interface AppTheme {
-  palette: Palette;
+  palette: ThemePalette;
   drawingColors: readonly string[];
 }
 

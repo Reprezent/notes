@@ -25,7 +25,7 @@ import {
 } from '../services/LocalVectorization.types';
 import { decodeImageToMask } from '../services/ImageMask';
 import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
-import { Palette, useTheme, withAlpha } from './theme';
+import { ThemePalette, useTheme, withAlpha } from './theme';
 
 // Smooth a path using quadratic curves
 const smoothPath = (points: { x: number; y: number }[]): string => {
@@ -761,7 +761,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             <TouchableOpacity
               onPress={() => handleToolSelect('eraser')}
               className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: selectedTool === 'eraser' ? palette.teal : 'transparent' }}>
+              style={{
+                backgroundColor: selectedTool === 'eraser' ? palette.secondary : 'transparent',
+              }}>
               <Ionicons
                 name="remove-circle-outline"
                 size={22}
@@ -958,7 +960,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   );
 };
 
-const createStyles = (palette: Palette) =>
+const createStyles = (palette: ThemePalette) =>
   StyleSheet.create({
     moreMenu: {
       position: 'absolute',
