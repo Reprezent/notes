@@ -178,6 +178,10 @@ const SliderControl: React.FC<SliderControlProps> = ({
     );
   }, []);
 
+  if (!panResponder) {
+    return null;
+  }
+
   const ratio = (value - minimum) / (maximum - minimum || 1);
   const displayValue = formatValue ? formatValue(value) : String(value);
 
@@ -193,7 +197,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
           const width = event.nativeEvent.layout.width;
           trackWidthRef.current = width;
         }}
-        {...panResponder?.panHandlers}>
+        {...panResponder.panHandlers}>
         <View pointerEvents="none" className="h-2 w-full rounded-full bg-teal-soft">
           <View
             pointerEvents="none"
