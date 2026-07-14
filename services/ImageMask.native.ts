@@ -78,5 +78,10 @@ export async function decodeImageToMask(
     thresholdElapsedMs: Date.now() - maskStartedAt,
     totalElapsedMs: Date.now() - startedAt,
   });
-  return { pixels, width, height };
+  return {
+    pixels,
+    width,
+    height,
+    foregroundCoveragePercent: Number(((foregroundPixels / pixelCount) * 100).toFixed(2)),
+  };
 }

@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Alert,
   PanResponder,
   Dimensions,
@@ -20,10 +21,11 @@ import {
   MAX_TRACE_OUTPUT_BYTES,
   MAX_TRACE_PATHS,
   type CompletedVectorizationResponse,
+  type TurnPolicy,
   LocalTraceError,
   type TraceSettings,
 } from '../services/LocalVectorization.types';
-import { decodeImageToMask } from '../services/ImageMask';
+import { decodeImageToMask, type DecodedImageMask } from '../services/ImageMask';
 import { drawingLog, uiLog, vectorizationLog } from '../services/Logger';
 import { drawingColors, palette } from './theme';
 
@@ -83,6 +85,148 @@ interface PersistedDrawing {
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const clamp = (value: number, minimum: number, maximum: number) =>
+  Math.min(maximum, Math.max(minimum, value));
+
+const roundToStep = (value: number, minimum: number, step: number) => {
+  if (step <= 0) {
+    return value;
+  }
+  const steps = Math.round((value - minimum) / step);
+  return minimum + steps * step;
+};
+
+interface SliderControlProps {
+  label: string;
+  value: number;
+  minimum: number;
+  maximum: number;
+  step: number;
+  onValueChange: (nextValue: number) => void;
+  formatValue?: (value: number) => string;
+}
+
+const SliderControl: React.FC<SliderControlProps> = ({
+  label,
+  value,
+  minimum,
+  maximum,
+  step,
+  onValueChange,
+  formatValue,
+}) => {
+  const [panResponder, setPanResponder] = useState<ReturnType<typeof PanResponder.create> | null>(
+    null
+  );
+  const trackWidthRef = useRef(1);
+  const dragStartValueRef = useRef(value);
+  const valueRef = useRef(value);
+  const minimumRef = useRef(minimum);
+  const maximumRef = useRef(maximum);
+  const stepRef = useRef(step);
+  const onValueChangeRef = useRef(onValueChange);
+
+  useEffect(() => {
+    valueRef.current = value;
+    minimumRef.current = minimum;
+    maximumRef.current = maximum;
+    stepRef.current = step;
+    onValueChangeRef.current = onValueChange;
+  }, [value, minimum, maximum, step, onValueChange]);
+
+  useLayoutEffect(() => {
+    setPanResponder(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          dragStartValueRef.current = valueRef.current;
+          const safeWidth = Math.max(trackWidthRef.current, 1);
+          const minimumValue = minimumRef.current;
+          const maximumValue = maximumRef.current;
+          const stepValue = stepRef.current;
+          const ratio = clamp(event.nativeEvent.locationX / safeWidth, 0, 1);
+          const nextValue = clamp(
+            roundToStep(
+              minimumValue + ratio * (maximumValue - minimumValue),
+              minimumValue,
+              stepValue
+            ),
+            minimumValue,
+            maximumValue
+          );
+          onValueChangeRef.current(nextValue);
+        },
+        onPanResponderMove: (_event, gestureState) => {
+          const safeWidth = Math.max(trackWidthRef.current, 1);
+          const minimumValue = minimumRef.current;
+          const maximumValue = maximumRef.current;
+          const stepValue = stepRef.current;
+          const range = maximumValue - minimumValue;
+          const nextValue = clamp(
+            roundToStep(
+              dragStartValueRef.current + (gestureState.dx / safeWidth) * range,
+              minimumValue,
+              stepValue
+            ),
+            minimumValue,
+            maximumValue
+          );
+          onValueChangeRef.current(nextValue);
+        },
+      })
+    );
+  }, []);
+
+  if (!panResponder) {
+    return null;
+  }
+
+  const ratio = (value - minimum) / (maximum - minimum || 1);
+  const displayValue = formatValue ? formatValue(value) : String(value);
+
+  return (
+    <View className="mb-4">
+      <View className="mb-2 flex-row items-center justify-between">
+        <Text className="text-sm font-semibold text-ink">{label}</Text>
+        <Text className="text-xs font-semibold text-muted">{displayValue}</Text>
+      </View>
+      <View
+        className="h-10 flex-row items-center"
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          trackWidthRef.current = width;
+        }}
+        {...panResponder.panHandlers}>
+        <View pointerEvents="none" className="h-2 w-full rounded-full bg-teal-soft">
+          <View
+            pointerEvents="none"
+            className="h-2 rounded-full bg-sky"
+            style={{ width: `${clamp(ratio * 100, 0, 100)}%` }}
+          />
+        </View>
+        <View
+          pointerEvents="none"
+          className="border-surface absolute h-5 w-5 rounded-full border-2 bg-teal"
+          style={{ left: `${clamp(ratio * 100, 0, 100)}%`, marginLeft: -10 }}
+        />
+      </View>
+    </View>
+  );
+};
+
+interface VectorPreviewState {
+  sourceImage: {
+    base64: string;
+    mimeType?: string | null;
+  };
+  request: DecodedImageMask;
+  settings: TraceSettings;
+  response: CompletedVectorizationResponse;
+}
+
+const turnPolicies: TurnPolicy[] = ['minority', 'black', 'white'];
+
 const defaultTraceSettings: TraceSettings = {
   threshold: 180,
   sensitivity: 50,
@@ -178,6 +322,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [vectorPreview, setVectorPreview] = useState<VectorPreviewState | null>(null);
+  const [isPreviewProcessing, setIsPreviewProcessing] = useState(false);
+  const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
+  const [previewWarningMessage, setPreviewWarningMessage] = useState<string | null>(null);
+  const previewRunIdRef = useRef(0);
+  const skipNextAutoPreviewRef = useRef(false);
 
   const { width, height } = Dimensions.get('window');
   const drawingHeight = Math.max(height - 150, 320);
@@ -577,6 +727,157 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     ]);
   };
 
+  const runVectorizationPass = async (
+    request: DecodedImageMask,
+    settings: TraceSettings
+  ): Promise<CompletedVectorizationResponse> => {
+    const response = await LocalVectorizationService.traceMask({
+      ...request,
+      settings,
+    });
+
+    if (response.kind !== 'completed') {
+      throw new Error('Local vectorization is not available yet.');
+    }
+    return response;
+  };
+
+  const warningForMaskCoverage = (mask: DecodedImageMask): string | null => {
+    if (Array.isArray(mask.warnings) && mask.warnings.length > 0) {
+      return mask.warnings[0];
+    }
+
+    if (typeof mask.foregroundCoveragePercent !== 'number') {
+      return null;
+    }
+    if (mask.foregroundCoveragePercent < 0.5) {
+      return 'Detected very little ink. Lower threshold or increase sensitivity.';
+    }
+    if (mask.foregroundCoveragePercent > 40) {
+      return 'Detected too much foreground. Increase threshold to avoid blob output.';
+    }
+    return null;
+  };
+
+  const runPreviewPass = async (
+    sourceImage: { base64: string; mimeType?: string | null },
+    settings: TraceSettings
+  ): Promise<{ request: DecodedImageMask; response: CompletedVectorizationResponse }> => {
+    const request = await decodeImageToMask(sourceImage.base64, settings, sourceImage.mimeType);
+    const response = await runVectorizationPass(request, settings);
+    return { request, response };
+  };
+
+  const closeVectorPreview = () => {
+    previewRunIdRef.current += 1;
+    setVectorPreview(null);
+    setPreviewErrorMessage(null);
+    setPreviewWarningMessage(null);
+    setIsPreviewProcessing(false);
+  };
+
+  const rerunPreviewWithSettings = async (
+    sourceImage: { base64: string; mimeType?: string | null },
+    settings: TraceSettings
+  ) => {
+    const runId = previewRunIdRef.current + 1;
+    previewRunIdRef.current = runId;
+
+    setIsPreviewProcessing(true);
+    setPreviewErrorMessage(null);
+    try {
+      const { request, response } = await runPreviewPass(sourceImage, settings);
+      setVectorPreview((current) => {
+        if (!current || previewRunIdRef.current !== runId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          request,
+          settings,
+          response,
+        };
+      });
+      if (previewRunIdRef.current === runId) {
+        setPreviewWarningMessage(warningForMaskCoverage(request));
+      }
+    } catch (error) {
+      const message =
+        error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
+          ? 'Those settings exceed local trace limits. Try reducing detail.'
+          : error instanceof Error
+            ? error.message
+            : 'Preview vectorization failed.';
+      if (previewRunIdRef.current === runId) {
+        setPreviewErrorMessage(message);
+      }
+    } finally {
+      if (previewRunIdRef.current === runId) {
+        setIsPreviewProcessing(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!vectorPreview) {
+      return;
+    }
+
+    if (skipNextAutoPreviewRef.current) {
+      skipNextAutoPreviewRef.current = false;
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void rerunPreviewWithSettings(vectorPreview.sourceImage, vectorPreview.settings);
+    }, 220);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [
+    vectorPreview?.settings.threshold,
+    vectorPreview?.settings.sensitivity,
+    vectorPreview?.settings.speckleMinArea,
+    vectorPreview?.settings.cornerThreshold,
+    vectorPreview?.settings.turnPolicy,
+    vectorPreview?.settings.optimizeCurve,
+  ]);
+
+  const updatePreviewSettings = (patch: Partial<TraceSettings>) => {
+    setVectorPreview((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        settings: {
+          ...current.settings,
+          ...patch,
+        },
+      };
+    });
+  };
+
+  const handleApplyVectorPreview = async () => {
+    if (!vectorPreview) {
+      return;
+    }
+
+    const tracedPaths = drawingPathsFromVectorization(
+      vectorPreview.response,
+      selectedColor,
+      canvasWidthRef.current,
+      canvasHeightRef.current
+    );
+
+    const newPaths = [...paths, ...tracedPaths];
+    setPaths(newPaths);
+    await saveDrawing(newPaths);
+    closeVectorPreview();
+  };
+
   const importAndVectorizeImage = async () => {
     if (isVectorizing) {
       vectorizationLog.warn('Vectorization request ignored because one is already running');
@@ -657,32 +958,28 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         height: request.height,
         bytes: request.pixels.byteLength,
       });
-      const response = await LocalVectorizationService.traceMask({
-        ...request,
-        settings: defaultTraceSettings,
-      });
+
+      const response = await runVectorizationPass(request, defaultTraceSettings);
       vectorizationLog.info('WASM trace completed', {
         kind: response.kind,
         pathCount: response.kind === 'completed' ? response.paths.length : 0,
       });
 
-      if (response.kind !== 'completed') {
-        Alert.alert('Vectorization unavailable', 'Local vectorization is not available yet.');
-        return;
-      }
-
-      const tracedPaths = drawingPathsFromVectorization(
+      setPreviewErrorMessage(null);
+      setPreviewWarningMessage(warningForMaskCoverage(request));
+      skipNextAutoPreviewRef.current = true;
+      setVectorPreview({
+        sourceImage: {
+          base64,
+          mimeType: asset.mimeType,
+        },
+        request,
+        settings: { ...defaultTraceSettings },
         response,
-        selectedColor,
-        canvasWidthRef.current,
-        canvasHeightRef.current
-      );
-      const newPaths = [...paths, ...tracedPaths];
-      setPaths(newPaths);
-      await saveDrawing(newPaths);
+      });
       drawingLog.info('Imported image vectorized successfully', {
         date,
-        pathCount: tracedPaths.length,
+        pathCount: response.paths.length,
         width: request.width,
         height: request.height,
       });
@@ -780,7 +1077,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                   className="flex-row items-center rounded-lg px-3 py-3">
                   <Ionicons name="camera-outline" size={20} color={palette.sky} />
                   <Text className="ml-3 text-sm font-bold text-ink">
-                    {isVectorizing ? 'Processing image...' : 'Camera'}
+                    {isVectorizing ? 'Processing image...' : 'Import image'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -937,6 +1234,163 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
           </Svg>
         </View>
       </View>
+
+      {vectorPreview && (
+        <TouchableWithoutFeedback>
+          <View style={styles.previewOverlay}>
+            <View className="border border-line bg-paper p-4" style={styles.previewCard}>
+              <View className="mb-3 flex-row items-start justify-between">
+                <View className="flex-1 pr-3">
+                  <Text className="text-base font-bold text-ink">Vector preview</Text>
+                  <Text className="mt-1 text-xs text-muted">
+                    First pass complete. Tune settings, re-run, then apply when handwriting looks
+                    clean.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={closeVectorPreview}
+                  className="h-9 w-9 items-center justify-center rounded-lg bg-canvas">
+                  <Ionicons name="close" size={20} color={palette.muted} />
+                </TouchableOpacity>
+              </View>
+
+              <View className="bg-surface mb-4 overflow-hidden rounded-lg border border-line">
+                <Svg width="100%" height={200} viewBox={vectorPreview.response.viewBox.join(' ')}>
+                  <Rect
+                    x={vectorPreview.response.viewBox[0]}
+                    y={vectorPreview.response.viewBox[1]}
+                    width={vectorPreview.response.viewBox[2]}
+                    height={vectorPreview.response.viewBox[3]}
+                    fill={palette.surfaceWarm}
+                  />
+                  {vectorPreview.response.paths.map((record, index) => (
+                    <Path
+                      key={`preview-${index}`}
+                      d={record.path}
+                      fill={selectedColor}
+                      fillRule={record.fillRule}
+                    />
+                  ))}
+                </Svg>
+              </View>
+
+              <Text className="mb-3 text-xs text-muted">
+                Paths: {vectorPreview.response.paths.length} • Pixels: {vectorPreview.request.width}{' '}
+                x {vectorPreview.request.height}
+              </Text>
+
+              {previewWarningMessage && (
+                <View className="mb-3 rounded-lg bg-amber-soft px-3 py-2">
+                  <Text className="text-xs font-semibold text-ink">{previewWarningMessage}</Text>
+                </View>
+              )}
+
+              <SliderControl
+                label="Threshold"
+                value={vectorPreview.settings.threshold}
+                minimum={40}
+                maximum={240}
+                step={1}
+                onValueChange={(nextValue) => updatePreviewSettings({ threshold: nextValue })}
+              />
+              <SliderControl
+                label="Sensitivity"
+                value={vectorPreview.settings.sensitivity}
+                minimum={0}
+                maximum={100}
+                step={1}
+                onValueChange={(nextValue) => updatePreviewSettings({ sensitivity: nextValue })}
+              />
+              <SliderControl
+                label="Speckle Min Area"
+                value={vectorPreview.settings.speckleMinArea}
+                minimum={0}
+                maximum={80}
+                step={1}
+                onValueChange={(nextValue) => updatePreviewSettings({ speckleMinArea: nextValue })}
+              />
+              <SliderControl
+                label="Corner Threshold"
+                value={vectorPreview.settings.cornerThreshold}
+                minimum={0.05}
+                maximum={1}
+                step={0.05}
+                formatValue={(value) => value.toFixed(2)}
+                onValueChange={(nextValue) =>
+                  updatePreviewSettings({ cornerThreshold: Number(nextValue.toFixed(2)) })
+                }
+              />
+
+              <Text className="mb-2 text-sm font-semibold text-ink">Turn policy</Text>
+              <View className="mb-3 flex-row flex-wrap">
+                {turnPolicies.map((policy) => {
+                  const active = vectorPreview.settings.turnPolicy === policy;
+                  return (
+                    <TouchableOpacity
+                      key={policy}
+                      onPress={() => updatePreviewSettings({ turnPolicy: policy })}
+                      className={`mb-2 mr-2 rounded-lg px-3 py-2 ${
+                        active ? 'bg-teal' : 'bg-canvas'
+                      }`}>
+                      <Text
+                        className={`text-xs font-semibold ${
+                          active ? 'text-surface' : 'text-muted'
+                        }`}>
+                        {policy}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                onPress={() =>
+                  updatePreviewSettings({ optimizeCurve: !vectorPreview.settings.optimizeCurve })
+                }
+                className="mb-4 flex-row items-center rounded-lg bg-canvas px-3 py-3">
+                <Ionicons
+                  name={vectorPreview.settings.optimizeCurve ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={palette.sky}
+                />
+                <Text className="ml-2 text-sm font-semibold text-ink">Optimize curves</Text>
+              </TouchableOpacity>
+
+              {previewErrorMessage && (
+                <View className="bg-coralSoft mb-3 rounded-lg px-3 py-2">
+                  <Text className="text-danger text-xs font-semibold">{previewErrorMessage}</Text>
+                </View>
+              )}
+
+              <View className="flex-row">
+                <TouchableOpacity
+                  disabled={isPreviewProcessing}
+                  onPress={() => {
+                    void rerunPreviewWithSettings(
+                      vectorPreview.sourceImage,
+                      vectorPreview.settings
+                    );
+                  }}
+                  className={`mr-2 flex-1 items-center rounded-lg px-3 py-3 ${
+                    isPreviewProcessing ? 'bg-disabled' : 'bg-sky'
+                  }`}>
+                  <Text className="text-surface text-sm font-bold">
+                    {isPreviewProcessing ? 'Auto-updating...' : 'Refresh now'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={isPreviewProcessing}
+                  onPress={handleApplyVectorPreview}
+                  className={`flex-1 items-center rounded-lg px-3 py-3 ${
+                    isPreviewProcessing ? 'bg-disabled' : 'bg-teal'
+                  }`}>
+                  <Text className="text-surface text-sm font-bold">Apply to drawing</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      )}
     </View>
   );
 };
@@ -974,6 +1428,35 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.14,
         shadowRadius: 18,
+      },
+    }),
+  },
+  previewOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(27, 58, 52, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 18,
+  },
+  previewCard: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 760,
+    maxHeight: '100%',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 12px 28px rgba(27, 58, 52, 0.24)',
+      },
+      default: {
+        elevation: 16,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.24,
+        shadowRadius: 28,
       },
     }),
   },
