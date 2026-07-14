@@ -4,6 +4,8 @@ export interface DecodedImageMask {
   pixels: Uint8Array;
   width: number;
   height: number;
+  foregroundCoveragePercent?: number;
+  warnings?: string[];
 }
 
 export function decodeImageToMask(
