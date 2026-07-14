@@ -10,11 +10,16 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import Svg, { Defs, Line, Path, Pattern, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, Path, Pattern, Rect } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { databaseService } from '../services/DatabaseService';
-import { getJournalType, JournalTypeId } from '../services/JournalTypes';
+import {
+  DEFAULT_JOURNAL_BACKGROUND_STYLE,
+  getJournalType,
+  JournalBackgroundStyle,
+  JournalTypeId,
+} from '../services/JournalTypes';
 import { LocalVectorizationService } from '../services/LocalVectorizationService';
 import {
   MAX_TRACE_OUTPUT_BYTES,
@@ -83,6 +88,12 @@ interface PersistedDrawing {
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
+  { label: 'Ruled', value: 'ruled' },
+  { label: 'Grid', value: 'grid' },
+  { label: 'Dot', value: 'dot' },
+  { label: 'Blank', value: 'blank' },
+];
 const defaultTraceSettings: TraceSettings = {
   threshold: 180,
   sensitivity: 50,
@@ -169,7 +180,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   const [selectedColor, setSelectedColor] = useState(drawingColors[0]);
   const [selectedTool, setSelectedTool] = useState<'pen' | 'eraser'>('pen');
   const [strokeWidth, setStrokeWidth] = useState(3);
-  const [activeToolOptions, setActiveToolOptions] = useState<'pen' | 'eraser' | null>(null);
+  const [backgroundStyle, setBackgroundStyle] = useState<JournalBackgroundStyle>(
+    DEFAULT_JOURNAL_BACKGROUND_STYLE
+  );
+  const [activeToolOptions, setActiveToolOptions] = useState<
+    'pen' | 'eraser' | 'background' | null
+  >(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -196,14 +212,18 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     let cancelled = false;
 
     drawingLog.info('Loading drawing', { date });
-    databaseService
-      .loadDrawing(date, journalType)
-      .then((savedDrawing) => {
+    Promise.all([
+      databaseService.loadDrawing(date, journalType),
+      databaseService.getJournalBackground(journalType),
+    ])
+      .then(([savedDrawing, savedBackground]) => {
         if (!cancelled) {
           const normalizedDrawing = normalizePersistedDrawing(savedDrawing);
           setPaths(normalizedDrawing.paths);
+          setBackgroundStyle(savedBackground);
           drawingLog.debug('Drawing loaded', {
             date,
+            backgroundStyle: savedBackground,
             pathCount: normalizedDrawing.paths.length,
           });
         }
@@ -713,6 +733,29 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     return formatted;
   };
 
+  const handleBackgroundStyleSelect = async (nextBackgroundStyle: JournalBackgroundStyle) => {
+    const previousBackgroundStyle = backgroundStyle;
+    setBackgroundStyle(nextBackgroundStyle);
+
+    try {
+      await databaseService.saveJournalBackground(journalType, nextBackgroundStyle);
+      drawingLog.info('Journal background updated', {
+        journalType,
+        backgroundStyle: nextBackgroundStyle,
+      });
+      setActiveToolOptions(null);
+      setIsMoreMenuOpen(false);
+    } catch (error) {
+      setBackgroundStyle(previousBackgroundStyle);
+      drawingLog.error('Error saving journal background', {
+        journalType,
+        backgroundStyle: nextBackgroundStyle,
+        error,
+      });
+      Alert.alert('Unable to save paper style', 'Please try changing the paper style again.');
+    }
+  };
+
   const formattedDate = formatDate(date);
   const journal = getJournalType(journalType);
   const toolOptionsPanelWidth = Math.max(
@@ -790,6 +833,17 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                   <Text className="ml-3 text-sm font-bold text-ink">Reset zoom</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  onPress={() => {
+                    setIsMoreMenuOpen(false);
+                    setActiveToolOptions((current) =>
+                      current === 'background' ? null : 'background'
+                    );
+                  }}
+                  className="flex-row items-center rounded-lg px-3 py-3">
+                  <Ionicons name="grid-outline" size={20} color={palette.teal} />
+                  <Text className="ml-3 text-sm font-bold text-ink">Paper style</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   onPress={handleClearCanvasAction}
                   className="flex-row items-center rounded-lg px-3 py-3">
                   <Ionicons name="trash-outline" size={20} color={palette.danger} />
@@ -826,27 +880,60 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                   </View>
                 )}
 
-                <View className="flex-row items-center justify-center">
-                  <Text className="mr-3 text-sm font-semibold text-muted">
-                    {activeToolOptions === 'eraser' ? 'Eraser size' : 'Stroke'}
-                  </Text>
-                  {strokeWidths.map((strokeOption) => (
-                    <TouchableOpacity
-                      key={strokeOption}
-                      onPress={() => setStrokeWidth(strokeOption)}
-                      className={`mr-2 h-11 w-11 items-center justify-center rounded-lg ${
-                        strokeWidth === strokeOption ? 'bg-amber-soft' : 'bg-canvas'
-                      }`}>
-                      <View
-                        className="rounded-full bg-ink"
-                        style={{
-                          height: strokeOption * 2 + 4,
-                          width: strokeOption * 2 + 4,
-                        }}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {activeToolOptions === 'background' && (
+                  <View className="flex-row flex-wrap justify-center">
+                    {backgroundOptions.map((option) => {
+                      const isSelected = backgroundStyle === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          onPress={() => void handleBackgroundStyleSelect(option.value)}
+                          className={`mb-2 mr-2 flex-row items-center rounded-full border px-4 py-2 ${
+                            isSelected ? 'border-teal bg-teal-soft' : 'border-line bg-canvas'
+                          }`}>
+                          <Text
+                            className={`text-sm font-semibold ${
+                              isSelected ? 'text-teal' : 'text-muted'
+                            }`}>
+                            {option.label}
+                          </Text>
+                          {isSelected && (
+                            <Ionicons
+                              name="checkmark"
+                              size={16}
+                              color={palette.teal}
+                              style={{ marginLeft: 6 }}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {activeToolOptions !== 'background' && (
+                  <View className="flex-row items-center justify-center">
+                    <Text className="mr-3 text-sm font-semibold text-muted">
+                      {activeToolOptions === 'eraser' ? 'Eraser size' : 'Stroke'}
+                    </Text>
+                    {strokeWidths.map((strokeOption) => (
+                      <TouchableOpacity
+                        key={strokeOption}
+                        onPress={() => setStrokeWidth(strokeOption)}
+                        className={`mr-2 h-11 w-11 items-center justify-center rounded-lg ${
+                          strokeWidth === strokeOption ? 'bg-amber-soft' : 'bg-canvas'
+                        }`}>
+                        <View
+                          className="rounded-full bg-ink"
+                          style={{
+                            height: strokeOption * 2 + 4,
+                            width: strokeOption * 2 + 4,
+                          }}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -887,9 +974,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 <Line x1="28" y1="0" x2="28" y2="28" stroke={palette.paperLine} strokeWidth="1" />
                 <Line x1="0" y1="28" x2="28" y2="28" stroke={palette.paperLine} strokeWidth="1" />
               </Pattern>
-              <Pattern id="gridOverlay" width="28" height="28" patternUnits="userSpaceOnUse">
-                <Line x1="28" y1="0" x2="28" y2="28" stroke={palette.paperLine} strokeWidth="1" />
+              <Pattern id="paperRuled" width="28" height="28" patternUnits="userSpaceOnUse">
+                <Rect width="28" height="28" fill={palette.surface} />
                 <Line x1="0" y1="28" x2="28" y2="28" stroke={palette.paperLine} strokeWidth="1" />
+              </Pattern>
+              <Pattern id="paperDot" width="28" height="28" patternUnits="userSpaceOnUse">
+                <Rect width="28" height="28" fill={palette.surface} />
+                <Circle cx="14" cy="14" r="1.35" fill={palette.paperLine} />
               </Pattern>
             </Defs>
             <Rect
@@ -897,7 +988,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               y={-canvasHeight * 2}
               width={canvasWidth * 5}
               height={canvasHeight * 5}
-              fill="url(#paperGrid)"
+              fill={
+                backgroundStyle === 'blank'
+                  ? palette.surface
+                  : backgroundStyle === 'ruled'
+                    ? 'url(#paperRuled)'
+                    : backgroundStyle === 'dot'
+                      ? 'url(#paperDot)'
+                      : 'url(#paperGrid)'
+              }
             />
 
             {paths.map((drawingPath, index) => (
@@ -925,15 +1024,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 fill="none"
               />
             )}
-
-            <Rect
-              x={-canvasWidth * 2}
-              y={-canvasHeight * 2}
-              width={canvasWidth * 5}
-              height={canvasHeight * 5}
-              fill="url(#gridOverlay)"
-              opacity={0.85}
-            />
           </Svg>
         </View>
       </View>
