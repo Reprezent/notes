@@ -83,7 +83,12 @@ const normalizeLuminance = (rgba: Uint8ClampedArray, pixelCount: number): Uint8A
   return normalized;
 };
 
-const cleanupMask = (pixels: Uint8Array, width: number, height: number, sensitivity: number): Uint8Array => {
+const cleanupMask = (
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  sensitivity: number
+): Uint8Array => {
   const output = new Uint8Array(pixels);
   const addThreshold = sensitivity >= 60 ? 7 : 8;
 

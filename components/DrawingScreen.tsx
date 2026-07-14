@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -115,55 +115,72 @@ const SliderControl: React.FC<SliderControlProps> = ({
   onValueChange,
   formatValue,
 }) => {
-  const [trackWidth, setTrackWidth] = useState(1);
+  const [panResponder, setPanResponder] = useState<ReturnType<typeof PanResponder.create> | null>(
+    null
+  );
   const trackWidthRef = useRef(1);
   const dragStartValueRef = useRef(value);
   const valueRef = useRef(value);
   const minimumRef = useRef(minimum);
   const maximumRef = useRef(maximum);
   const stepRef = useRef(step);
+  const onValueChangeRef = useRef(onValueChange);
 
   useEffect(() => {
     valueRef.current = value;
     minimumRef.current = minimum;
     maximumRef.current = maximum;
     stepRef.current = step;
-  }, [value, minimum, maximum, step]);
+    onValueChangeRef.current = onValueChange;
+  }, [value, minimum, maximum, step, onValueChange]);
 
-  const updateFromLocation = (locationX: number) => {
-    const safeWidth = Math.max(trackWidth, 1);
-    const ratio = clamp(locationX / safeWidth, 0, 1);
-    const nextValue = clamp(roundToStep(minimum + ratio * (maximum - minimum), minimum, step), minimum, maximum);
-    onValueChange(nextValue);
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => {
-        dragStartValueRef.current = valueRef.current;
-        updateFromLocation(event.nativeEvent.locationX);
-      },
-      onPanResponderMove: (_event, gestureState) => {
-        const safeWidth = Math.max(trackWidthRef.current, 1);
-        const minimumValue = minimumRef.current;
-        const maximumValue = maximumRef.current;
-        const stepValue = stepRef.current;
-        const range = maximumValue - minimumValue;
-        const nextValue = clamp(
-          roundToStep(
-            dragStartValueRef.current + (gestureState.dx / safeWidth) * range,
+  useLayoutEffect(() => {
+    setPanResponder(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          dragStartValueRef.current = valueRef.current;
+          const safeWidth = Math.max(trackWidthRef.current, 1);
+          const minimumValue = minimumRef.current;
+          const maximumValue = maximumRef.current;
+          const stepValue = stepRef.current;
+          const ratio = clamp(event.nativeEvent.locationX / safeWidth, 0, 1);
+          const nextValue = clamp(
+            roundToStep(
+              minimumValue + ratio * (maximumValue - minimumValue),
+              minimumValue,
+              stepValue
+            ),
             minimumValue,
-            stepValue
-          ),
-          minimumValue,
-          maximumValue
-        );
-        onValueChange(nextValue);
-      },
-    })
-  ).current;
+            maximumValue
+          );
+          onValueChangeRef.current(nextValue);
+        },
+        onPanResponderMove: (_event, gestureState) => {
+          const safeWidth = Math.max(trackWidthRef.current, 1);
+          const minimumValue = minimumRef.current;
+          const maximumValue = maximumRef.current;
+          const stepValue = stepRef.current;
+          const range = maximumValue - minimumValue;
+          const nextValue = clamp(
+            roundToStep(
+              dragStartValueRef.current + (gestureState.dx / safeWidth) * range,
+              minimumValue,
+              stepValue
+            ),
+            minimumValue,
+            maximumValue
+          );
+          onValueChangeRef.current(nextValue);
+        },
+      })
+    );
+  }, []);
+
+  if (!panResponder) {
+    return null;
+  }
 
   const ratio = (value - minimum) / (maximum - minimum || 1);
   const displayValue = formatValue ? formatValue(value) : String(value);
@@ -178,7 +195,6 @@ const SliderControl: React.FC<SliderControlProps> = ({
         className="h-10 flex-row items-center"
         onLayout={(event) => {
           const width = event.nativeEvent.layout.width;
-          setTrackWidth(width);
           trackWidthRef.current = width;
         }}
         {...panResponder.panHandlers}>
@@ -191,7 +207,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
         </View>
         <View
           pointerEvents="none"
-          className="absolute h-5 w-5 rounded-full border-2 border-surface bg-teal"
+          className="border-surface absolute h-5 w-5 rounded-full border-2 bg-teal"
           style={{ left: `${clamp(ratio * 100, 0, 100)}%`, marginLeft: -10 }}
         />
       </View>
@@ -1227,7 +1243,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 <View className="flex-1 pr-3">
                   <Text className="text-base font-bold text-ink">Vector preview</Text>
                   <Text className="mt-1 text-xs text-muted">
-                    First pass complete. Tune settings, re-run, then apply when handwriting looks clean.
+                    First pass complete. Tune settings, re-run, then apply when handwriting looks
+                    clean.
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1237,7 +1254,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 </TouchableOpacity>
               </View>
 
-              <View className="mb-4 overflow-hidden rounded-lg border border-line bg-surface">
+              <View className="bg-surface mb-4 overflow-hidden rounded-lg border border-line">
                 <Svg width="100%" height={200} viewBox={vectorPreview.response.viewBox.join(' ')}>
                   <Rect
                     x={vectorPreview.response.viewBox[0]}
@@ -1258,8 +1275,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               </View>
 
               <Text className="mb-3 text-xs text-muted">
-                Paths: {vectorPreview.response.paths.length} • Pixels: {vectorPreview.request.width} x{' '}
-                {vectorPreview.request.height}
+                Paths: {vectorPreview.response.paths.length} • Pixels: {vectorPreview.request.width}{' '}
+                x {vectorPreview.request.height}
               </Text>
 
               {previewWarningMessage && (
@@ -1340,8 +1357,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
               </TouchableOpacity>
 
               {previewErrorMessage && (
-                <View className="mb-3 rounded-lg bg-coralSoft px-3 py-2">
-                  <Text className="text-xs font-semibold text-danger">{previewErrorMessage}</Text>
+                <View className="bg-coralSoft mb-3 rounded-lg px-3 py-2">
+                  <Text className="text-danger text-xs font-semibold">{previewErrorMessage}</Text>
                 </View>
               )}
 
@@ -1349,12 +1366,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                 <TouchableOpacity
                   disabled={isPreviewProcessing}
                   onPress={() => {
-                    void rerunPreviewWithSettings(vectorPreview.sourceImage, vectorPreview.settings);
+                    void rerunPreviewWithSettings(
+                      vectorPreview.sourceImage,
+                      vectorPreview.settings
+                    );
                   }}
                   className={`mr-2 flex-1 items-center rounded-lg px-3 py-3 ${
                     isPreviewProcessing ? 'bg-disabled' : 'bg-sky'
                   }`}>
-                  <Text className="text-sm font-bold text-surface">
+                  <Text className="text-surface text-sm font-bold">
                     {isPreviewProcessing ? 'Auto-updating...' : 'Refresh now'}
                   </Text>
                 </TouchableOpacity>
@@ -1364,7 +1384,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                   className={`flex-1 items-center rounded-lg px-3 py-3 ${
                     isPreviewProcessing ? 'bg-disabled' : 'bg-teal'
                   }`}>
-                  <Text className="text-sm font-bold text-surface">Apply to drawing</Text>
+                  <Text className="text-surface text-sm font-bold">Apply to drawing</Text>
                 </TouchableOpacity>
               </View>
             </View>
