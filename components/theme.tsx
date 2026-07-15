@@ -79,5 +79,6 @@ export const withAlpha = (color: string, opacity: number) => {
   const red = Number.parseInt(normalizedHex.slice(0, 2), 16);
   const green = Number.parseInt(normalizedHex.slice(2, 4), 16);
   const blue = Number.parseInt(normalizedHex.slice(4, 6), 16);
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+  const clampedOpacity = Math.min(1, Math.max(0, opacity));
+  return `rgba(${red}, ${green}, ${blue}, ${clampedOpacity})`;
 };
