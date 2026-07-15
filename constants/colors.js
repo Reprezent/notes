@@ -32,5 +32,4 @@ const colors = {
   danger: '#C05A5A',
   disabled: '#C9D7D3',
 };
-
 module.exports = colors;

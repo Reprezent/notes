@@ -26,5 +26,4 @@ declare const colors: {
   readonly danger: string;
   readonly disabled: string;
 };
-
 export = colors;
