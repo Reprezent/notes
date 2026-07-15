@@ -1,30 +1,29 @@
 import React, { createContext, useContext } from 'react';
-
-const softWhite = '#FAFCFB';
+import colors from '../constants/colors';
 
 export const palette = {
-  background: '#F5FAF7',
-  surface: '#FFFFFF',
-  whiteSoft: softWhite,
-  ink: '#1B3A34',
-  muted: '#5B7A73',
-  subtle: '#8BA89F',
-  border: '#D9E8E3',
-  coral: '#D97B6D',
-  coralSoft: '#F0D8D0',
-  teal: '#2D5F54',
-  tealSoft: '#D9E8E3',
-  accent: '#3F7A58',
-  accentSoft: '#E1EFE5',
-  secondary: '#4D8A63',
-  secondarySoft: '#E7F2E9',
-  tertiary: '#6E9B5E',
-  tertiarySoft: '#EAF2E2',
-  paper: softWhite,
-  paperLine: '#DFE9E2',
-  danger: '#C05A5A',
-  disabled: '#C9D7D3',
-} as const;
+  background: colors.canvas,
+  surface: colors.surface,
+  whiteSoft: colors.paper,
+  ink: colors.ink,
+  muted: colors.muted,
+  subtle: colors.subtle,
+  border: colors.line,
+  coral: colors.coral,
+  coralSoft: colors.coralSoft,
+  teal: colors.teal,
+  tealSoft: colors.tealSoft,
+  accent: colors.accent,
+  accentSoft: colors.accentSoft,
+  secondary: colors.secondary,
+  secondarySoft: colors.secondarySoft,
+  tertiary: colors.tertiary,
+  tertiarySoft: colors.tertiarySoft,
+  paper: colors.paper,
+  paperLine: colors.paperLine,
+  danger: colors.danger,
+  disabled: colors.disabled,
+};
 
 export const drawingColors = [
   '#2F2A3A',
