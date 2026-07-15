@@ -280,15 +280,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect, onImpor
       label: 'Days journaled',
       value: daysJournaled,
       icon: 'book-outline',
-      color: palette.sky,
-      softColor: palette.skySoft,
+      color: palette.accent,
+      softColor: palette.accentSoft,
     },
     {
       label: 'Longest streak',
       value: longestStreak,
       icon: 'trophy-outline',
-      color: palette.amber,
-      softColor: palette.amberSoft,
+      color: palette.tertiary,
+      softColor: palette.tertiarySoft,
     },
   ];
 

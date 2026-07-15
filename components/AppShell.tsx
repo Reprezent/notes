@@ -53,7 +53,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, menuItems }) => {
                 onPress={() => handleMenuItemPress(item)}
                 className="mb-2 flex-row items-center rounded-lg bg-canvas px-3 py-3">
                 <View className="mr-3 h-10 w-10 items-center justify-center rounded-lg bg-lavender-soft">
-                  <Ionicons name={item.icon} size={21} color={palette.lavender} />
+                  <Ionicons name={item.icon} size={21} color={palette.secondary} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-bold text-ink">{item.label}</Text>
