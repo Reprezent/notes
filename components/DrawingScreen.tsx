@@ -1239,10 +1239,25 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         </View>
       </View>
 
-      <View className="flex-1 bg-canvas">
+      <View className="flex-1 bg-canvas p-4">
         <View
           className="bg-surface overflow-hidden"
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            borderRadius: 8,
+            ...Platform.select({
+              web: {
+                boxShadow: '0px 8px 16px rgba(79, 141, 247, 0.08)',
+              },
+              default: {
+                shadowColor: palette.sky,
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.08,
+                shadowRadius: 16,
+                elevation: 2,
+              },
+            }),
+          }}
           onLayout={handleCanvasLayout}
           {...panResponder.panHandlers}>
           <Svg
