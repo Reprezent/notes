@@ -1,4 +1,4 @@
-import { NativeModule, requireNativeModule } from 'expo';
+import { NativeModule, requireOptionalNativeModule } from 'expo';
 import type { NativeTraceJson } from './ExpoLocalVectorizer.types';
 
 declare class ExpoLocalVectorizerModule extends NativeModule<Record<string, never>> {
@@ -18,4 +18,4 @@ declare class ExpoLocalVectorizerModule extends NativeModule<Record<string, neve
   ): Promise<NativeTraceJson>;
 }
 
-export default requireNativeModule<ExpoLocalVectorizerModule>('ExpoLocalVectorizer');
+export default requireOptionalNativeModule<ExpoLocalVectorizerModule>('ExpoLocalVectorizer');
