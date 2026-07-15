@@ -11,6 +11,7 @@
     "web": "expo start --web",
     "preview:web": "node scripts/preview-web.cjs",
     "tracer:build": "cargo xtask build-all",
+    "tracer:build:android": "cargo xtask build-android",
     "tracer:build:web": "cargo xtask build-web",
     "tracer:verify": "cargo xtask verify-artifacts",
     "tracer:verify:web": "cargo xtask verify-web",
@@ -56,5 +57,12 @@
     "typescript": "~6.0.3"
   },
   "main": "node_modules/expo/AppEntry.js",
+  "expo": {
+    "autolinking": {
+      "searchPaths": [
+        "./modules"
+      ]
+    }
+  },
   "private": true
 }
