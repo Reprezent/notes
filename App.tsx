@@ -17,6 +17,7 @@ export default function App() {
   const [selectedJournal, setSelectedJournal] = useState<{
     date: string;
     journalType: JournalTypeId;
+    initialImage?: { base64: string; mimeType?: string | null };
   } | null>(null);
   const [homeKey, setHomeKey] = useState(0);
 
@@ -33,6 +34,16 @@ export default function App() {
     setCurrentScreen('drawing');
   };
 
+  const handleImportFromPicture = (
+    date: string,
+    journalType: JournalTypeId,
+    image: { base64: string; mimeType?: string | null }
+  ) => {
+    log.info('Navigating to journal entry with imported image', { date, journalType });
+    setSelectedJournal({ date, journalType, initialImage: image });
+    setCurrentScreen('drawing');
+  };
+
   const handleBackToHome = () => {
     setCurrentScreen('home');
     setSelectedJournal(null);
@@ -44,11 +55,16 @@ export default function App() {
       {() => (
         <>
           {currentScreen === 'home' ? (
-            <HomeScreen key={homeKey} onJournalSelect={handleJournalSelect} />
+            <HomeScreen
+              key={homeKey}
+              onJournalSelect={handleJournalSelect}
+              onImportFromPicture={handleImportFromPicture}
+            />
           ) : selectedJournal ? (
             <DrawingScreen
               date={selectedJournal.date}
               journalType={selectedJournal.journalType}
+              initialImage={selectedJournal.initialImage}
               onBack={handleBackToHome}
             />
           ) : null}

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Animated,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,12 +12,18 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { databaseService, JournalEntry } from '../services/DatabaseService';
 import { JOURNAL_TYPES, JournalType, JournalTypeId } from '../services/JournalTypes';
 import { palette } from './theme';
 
 interface HomeScreenProps {
   onJournalSelect: (date: string, journalType: JournalTypeId) => void;
+  onImportFromPicture: (
+    date: string,
+    journalType: JournalTypeId,
+    image: { base64: string; mimeType?: string | null }
+  ) => void;
 }
 
 type HomeTab = 'home' | 'calendar' | 'notifications';
@@ -77,11 +85,19 @@ const getStreaks = (entries: JournalEntry[], today: Date) => {
   return { currentStreak, longestStreak, daysJournaled: journaledDays.size };
 };
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect, onImportFromPicture }) => {
   const [activeTab, setActiveTab] = useState<HomeTab>('home');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [menuAnimation] = useState(() => new Animated.Value(0));
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importDate, setImportDate] = useState('');
+  const [importJournalType, setImportJournalType] = useState<JournalTypeId>('daily-diary');
+  const [pendingImportImage, setPendingImportImage] = useState<{
+    base64: string;
+    mimeType?: string | null;
+  } | null>(null);
+  const [isPickingImage, setIsPickingImage] = useState(false);
   const today = new Date();
   const todayString = dateString(today);
 
@@ -117,15 +133,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
   };
 
   const toggleCreateMenu = () => {
-    if (availableToday.length === 1) {
-      openJournal(availableToday[0]);
-      return;
-    }
-
-    if (availableToday.length === 0) {
-      return;
-    }
-
     const nextOpen = !isCreateMenuOpen;
     setIsCreateMenuOpen(nextOpen);
     Animated.spring(menuAnimation, {
@@ -135,12 +142,122 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
     }).start();
   };
 
+  const closeCreateMenu = () => {
+    setIsCreateMenuOpen(false);
+    Animated.spring(menuAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 8,
+    }).start();
+  };
+
+  const handleImportFromPicturePress = async () => {
+    closeCreateMenu();
+    setIsPickingImage(true);
+    try {
+      if (Platform.OS !== 'web') {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          Alert.alert(
+            'Permission required',
+            'Photo library permission is required to import images.'
+          );
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 1,
+        base64: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset) {
+        Alert.alert('Error', 'No image was returned.');
+        return;
+      }
+
+      let base64 = asset.base64;
+      if (!base64 && Platform.OS === 'web') {
+        const imageResponse = await fetch(asset.uri);
+        if (!imageResponse.ok) {
+          throw new Error(`Image download failed with status ${imageResponse.status}.`);
+        }
+        const blob = await imageResponse.blob();
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const value = reader.result;
+            if (typeof value !== 'string') {
+              reject(new Error('Image data could not be read.'));
+              return;
+            }
+            const separator = value.indexOf(',');
+            resolve(separator >= 0 ? value.slice(separator + 1) : value);
+          };
+          reader.onerror = () => reject(new Error('Image data could not be read.'));
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      if (!base64) {
+        Alert.alert('Error', 'The selected image could not be read.');
+        return;
+      }
+
+      setPendingImportImage({ base64, mimeType: asset.mimeType });
+      setImportDate(todayString);
+      setImportJournalType('daily-diary');
+      setIsImportModalOpen(true);
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to select image.');
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImportImage) {
+      return;
+    }
+    setIsImportModalOpen(false);
+    await databaseService.createJournalEntry(importDate, importJournalType);
+    onImportFromPicture(importDate, importJournalType, pendingImportImage);
+    setPendingImportImage(null);
+  };
+
+  const handleCancelImport = () => {
+    setIsImportModalOpen(false);
+    setPendingImportImage(null);
+  };
+
   const markedDates = entries.reduce<
     Record<string, { marked: boolean; dotColor: string; selectedDotColor: string }>
   >((marks, entry) => {
     marks[entry.date] = { marked: true, dotColor: palette.teal, selectedDotColor: palette.surface };
     return marks;
   }, {});
+
+  const importMarkedDates = {
+    ...markedDates,
+    ...(importDate
+      ? {
+          [importDate]: {
+            selected: true,
+            selectedColor: palette.teal,
+            marked: Boolean(markedDates[importDate]?.marked),
+            dotColor: palette.surface,
+            selectedDotColor: palette.surface,
+          },
+        }
+      : {}),
+  };
 
   const progressCards: {
     label: string;
@@ -392,8 +509,129 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect }) => {
               <Text className="text-sm font-bold text-ink">{journal.name}</Text>
             </TouchableOpacity>
           ))}
+          {availableToday.length > 0 && <View className="mx-4 border-t border-line" />}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Import from picture"
+            disabled={isPickingImage}
+            onPress={() => void handleImportFromPicturePress()}
+            className="flex-row items-center px-4 py-3">
+            <Ionicons
+              name="image-outline"
+              size={16}
+              color={isPickingImage ? palette.disabled : palette.sky}
+              style={{ marginRight: 12 }}
+            />
+            <Text
+              className="text-sm font-bold"
+              style={{ color: isPickingImage ? palette.disabled : palette.ink }}>
+              {isPickingImage ? 'Selecting image...' : 'Import from picture'}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
+
+      <Modal
+        visible={isImportModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelImport}>
+        <View style={styles.importOverlay}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.importBackdrop}
+            onPress={handleCancelImport}
+          />
+          <View style={styles.importCard} className="border border-line bg-paper">
+            <View className="flex-row items-center justify-between border-b border-line px-4 py-3">
+              <Text className="text-base font-bold text-ink">Import from picture</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Close import modal"
+                onPress={handleCancelImport}
+                className="h-9 w-9 items-center justify-center rounded-lg bg-canvas">
+                <Ionicons name="close" size={20} color={palette.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.importScrollContent}>
+              <Text className="mb-2 text-sm font-semibold text-ink">Select date</Text>
+              <View className="mb-4 overflow-hidden rounded-xl border border-line">
+                <Calendar
+                  onDayPress={(day) => setImportDate(day.dateString)}
+                  markedDates={importMarkedDates}
+                  theme={{
+                    calendarBackground: palette.paper,
+                    textSectionTitleColor: palette.subtle,
+                    todayTextColor: palette.coral,
+                    dayTextColor: palette.ink,
+                    textDisabledColor: palette.disabled,
+                    arrowColor: palette.ink,
+                    monthTextColor: palette.ink,
+                    selectedDayBackgroundColor: palette.teal,
+                    selectedDayTextColor: palette.surface,
+                  }}
+                />
+              </View>
+
+              <Text className="mb-2 text-sm font-semibold text-ink">Select journal</Text>
+              <View className="mb-4 flex-row flex-wrap">
+                {JOURNAL_TYPES.map((journal) => {
+                  const isSelected = importJournalType === journal.id;
+                  return (
+                    <TouchableOpacity
+                      key={journal.id}
+                      accessibilityRole="radio"
+                      accessibilityLabel={journal.name}
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => setImportJournalType(journal.id)}
+                      className={`mb-2 mr-2 flex-row items-center rounded-full border px-4 py-2 ${
+                        isSelected ? 'border-teal bg-teal-soft' : 'border-line bg-canvas'
+                      }`}>
+                      <Text
+                        className={`text-sm font-semibold ${
+                          isSelected ? 'text-teal' : 'text-muted'
+                        }`}>
+                        {journal.name}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons
+                          name="checkmark"
+                          size={14}
+                          color={palette.teal}
+                          style={{ marginLeft: 4 }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View className="flex-row border-t border-line px-4 py-4">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                onPress={handleCancelImport}
+                className="mr-3 flex-1 items-center rounded-xl border border-line py-3">
+                <Text className="text-sm font-bold text-muted">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Import image"
+                disabled={!importDate}
+                onPress={() => void handleConfirmImport()}
+                className={`flex-1 items-center rounded-xl py-3 ${
+                  importDate ? 'bg-teal' : 'bg-disabled'
+                }`}>
+                <Text className="text-surface text-sm font-bold">Import</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View className="absolute bottom-0 left-0 right-0 border-t border-line bg-paper px-2 pb-5 pt-2">
         <View className="flex-row items-center justify-around">
@@ -491,5 +729,33 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
       },
     }),
+  },
+  importOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(27, 58, 52, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  importBackdrop: {
+    flex: 1,
+  },
+  importCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '88%',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px -4px 24px rgba(27, 58, 52, 0.18)',
+      },
+      default: {
+        elevation: 16,
+        shadowColor: palette.ink,
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+      },
+    }),
+  },
+  importScrollContent: {
+    padding: 16,
   },
 });
