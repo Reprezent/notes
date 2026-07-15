@@ -227,6 +227,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onJournalSelect, onImpor
       return;
     }
     setIsImportModalOpen(false);
+    // Create the entry before navigating, consistent with openJournal. If vectorization
+    // later fails in DrawingScreen the entry will still exist but the user can draw
+    // manually or retry the import — the same trade-off applies to all journal creation.
     await databaseService.createJournalEntry(importDate, importJournalType);
     onImportFromPicture(importDate, importJournalType, pendingImportImage);
     setPendingImportImage(null);

@@ -449,6 +449,11 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
   useEffect(() => {
     if (!initialImage) return;
     const { base64, mimeType } = initialImage;
+    // Defer with setTimeout so setState calls inside startVectorizationFromImage
+    // don't run synchronously in the effect body (avoids react-hooks/set-state-in-effect).
+    // This effect is intentionally run only once on mount: DrawingScreen is always
+    // unmounted and remounted when navigating to a different entry, so initialImage
+    // (a navigation-time prop) never changes while the component is alive.
     const timer = setTimeout(() => {
       void startVectorizationFromImage(base64, mimeType);
     }, 0);
