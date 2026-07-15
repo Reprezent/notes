@@ -28,7 +28,7 @@ export const localVectorizationService: LocalVectorizationServiceContract = {
       assertValidTraceMaskRequest(request);
       if (!ExpoLocalVectorizer) {
         throw new Error(
-          'Image vectorization is unavailable because this build does not include it.'
+          'Image vectorization is unavailable because this build does not include it. Rebuild the app with the vectorizer module included to enable this feature.'
         );
       }
       vectorizationLog.debug('Native trace request validated');
