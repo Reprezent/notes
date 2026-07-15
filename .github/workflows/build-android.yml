@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: android-${{ github.ref }}
@@ -45,6 +47,7 @@ jobs:
         run: ./gradlew assembleDebug bundleRelease --no-daemon
 
       - name: Upload installable APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v6
         with:
           name: notes-android-apk
@@ -53,6 +56,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Android App Bundle
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v6
         with:
           name: notes-android-bundle
