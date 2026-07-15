@@ -74,6 +74,7 @@ interface DrawingScreenProps {
   date: string;
   journalType: JournalTypeId;
   onBack: () => void;
+  initialImage?: { base64: string; mimeType?: string | null };
 }
 
 interface DrawingPath {
@@ -317,7 +318,12 @@ const drawingPathsFromVectorization = (
   }));
 };
 
-export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType, onBack }) => {
+export const DrawingScreen: React.FC<DrawingScreenProps> = ({
+  date,
+  journalType,
+  onBack,
+  initialImage,
+}) => {
   const { drawingColors, palette } = useTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [paths, setPaths] = useState<DrawingPath[]>([]);
@@ -359,6 +365,103 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   const canvasHeightRef = useRef(canvasHeight);
   const isPanningRef = useRef(isPanning);
   const lastPanPointRef = useRef(lastPanPoint);
+
+  const runVectorizationPass = async (
+    request: DecodedImageMask,
+    settings: TraceSettings
+  ): Promise<CompletedVectorizationResponse> => {
+    const response = await LocalVectorizationService.traceMask({
+      ...request,
+      settings,
+    });
+
+    if (response.kind !== 'completed') {
+      throw new Error('Local vectorization is not available yet.');
+    }
+    return response;
+  };
+
+  const warningForMaskCoverage = (mask: DecodedImageMask): string | null => {
+    if (Array.isArray(mask.warnings) && mask.warnings.length > 0) {
+      return mask.warnings[0];
+    }
+
+    if (typeof mask.foregroundCoveragePercent !== 'number') {
+      return null;
+    }
+    if (mask.foregroundCoveragePercent < 0.5) {
+      return 'Detected very little ink. Lower threshold or increase sensitivity.';
+    }
+    if (mask.foregroundCoveragePercent > 40) {
+      return 'Detected too much foreground. Increase threshold to avoid blob output.';
+    }
+    return null;
+  };
+
+  const startVectorizationFromImage = async (base64: string, mimeType?: string | null) => {
+    if (isVectorizing) {
+      vectorizationLog.warn('Vectorization request ignored because one is already running');
+      return;
+    }
+
+    setIsVectorizing(true);
+    try {
+      const request = await decodeImageToMask(base64, defaultTraceSettings, mimeType);
+      vectorizationLog.info('Binary mask ready', {
+        width: request.width,
+        height: request.height,
+        bytes: request.pixels.byteLength,
+      });
+
+      const response = await runVectorizationPass(request, defaultTraceSettings);
+      vectorizationLog.info('WASM trace completed', {
+        kind: response.kind,
+        pathCount: response.kind === 'completed' ? response.paths.length : 0,
+      });
+
+      setPreviewErrorMessage(null);
+      setPreviewWarningMessage(warningForMaskCoverage(request));
+      skipNextAutoPreviewRef.current = true;
+      setVectorPreview({
+        sourceImage: { base64, mimeType },
+        request,
+        settings: { ...defaultTraceSettings },
+        response,
+      });
+      drawingLog.info('Image vectorized successfully', {
+        date,
+        pathCount: response.paths.length,
+        width: request.width,
+        height: request.height,
+      });
+    } catch (error) {
+      drawingLog.error('Image vectorization failed', { date, error });
+      const message =
+        error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
+          ? 'The selected image is too large to vectorize on this device.'
+          : error instanceof Error
+            ? error.message
+            : 'The selected image could not be vectorized.';
+      Alert.alert('Vectorization failed', message);
+    } finally {
+      setIsVectorizing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!initialImage) return;
+    const { base64, mimeType } = initialImage;
+    // Defer with setTimeout so setState calls inside startVectorizationFromImage
+    // don't run synchronously in the effect body (avoids react-hooks/set-state-in-effect).
+    // This effect is intentionally run only once on mount: DrawingScreen is always
+    // unmounted and remounted when navigating to a different entry, so initialImage
+    // (a navigation-time prop) never changes while the component is alive.
+    const timer = setTimeout(() => {
+      void startVectorizationFromImage(base64, mimeType);
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -749,38 +852,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
     ]);
   };
 
-  const runVectorizationPass = async (
-    request: DecodedImageMask,
-    settings: TraceSettings
-  ): Promise<CompletedVectorizationResponse> => {
-    const response = await LocalVectorizationService.traceMask({
-      ...request,
-      settings,
-    });
-
-    if (response.kind !== 'completed') {
-      throw new Error('Local vectorization is not available yet.');
-    }
-    return response;
-  };
-
-  const warningForMaskCoverage = (mask: DecodedImageMask): string | null => {
-    if (Array.isArray(mask.warnings) && mask.warnings.length > 0) {
-      return mask.warnings[0];
-    }
-
-    if (typeof mask.foregroundCoveragePercent !== 'number') {
-      return null;
-    }
-    if (mask.foregroundCoveragePercent < 0.5) {
-      return 'Detected very little ink. Lower threshold or increase sensitivity.';
-    }
-    if (mask.foregroundCoveragePercent > 40) {
-      return 'Detected too much foreground. Increase threshold to avoid blob output.';
-    }
-    return null;
-  };
-
   const runPreviewPass = async (
     sourceImage: { base64: string; mimeType?: string | null },
     settings: TraceSettings
@@ -908,7 +979,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
 
     vectorizationLog.info('Starting image picker');
     drawingLog.info('Starting image vectorization', { date, platform: Platform.OS });
-    setIsVectorizing(true);
     try {
       if (Platform.OS !== 'web') {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -974,37 +1044,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         throw new Error('The selected image could not be read for vectorization.');
       }
 
-      const request = await decodeImageToMask(base64, defaultTraceSettings, asset.mimeType);
-      vectorizationLog.info('Binary mask ready', {
-        width: request.width,
-        height: request.height,
-        bytes: request.pixels.byteLength,
-      });
-
-      const response = await runVectorizationPass(request, defaultTraceSettings);
-      vectorizationLog.info('WASM trace completed', {
-        kind: response.kind,
-        pathCount: response.kind === 'completed' ? response.paths.length : 0,
-      });
-
-      setPreviewErrorMessage(null);
-      setPreviewWarningMessage(warningForMaskCoverage(request));
-      skipNextAutoPreviewRef.current = true;
-      setVectorPreview({
-        sourceImage: {
-          base64,
-          mimeType: asset.mimeType,
-        },
-        request,
-        settings: { ...defaultTraceSettings },
-        response,
-      });
-      drawingLog.info('Imported image vectorized successfully', {
-        date,
-        pathCount: response.paths.length,
-        width: request.width,
-        height: request.height,
-      });
+      await startVectorizationFromImage(base64, asset.mimeType);
     } catch (error) {
       drawingLog.error('Image vectorization failed', { date, error });
       const message =
@@ -1014,8 +1054,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
             ? error.message
             : 'The selected image could not be vectorized.';
       Alert.alert('Vectorization failed', message);
-    } finally {
-      setIsVectorizing(false);
     }
   };
 
