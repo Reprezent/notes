@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-=======
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
->>>>>>> origin/main
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -1195,32 +1191,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                   </View>
                 )}
 
-<<<<<<< HEAD
-                <View className="flex-row items-center justify-center">
-                  <Text className="mr-3 text-sm font-semibold text-muted">
-                    {activeToolOptions === 'eraser' ? 'Eraser size' : 'Stroke'}
-                  </Text>
-                  {strokeWidths.map((strokeOption) => (
-                    <TouchableOpacity
-                      key={strokeOption}
-                      onPress={() => setStrokeWidth(strokeOption)}
-                      className="mr-2 h-11 w-11 items-center justify-center rounded-lg"
-                      style={{
-                        backgroundColor:
-                          strokeWidth === strokeOption ? palette.tealSoft : palette.background,
-                      }}>
-                      <View
-                        className="rounded-full"
-                        style={{
-                          backgroundColor: palette.ink,
-                          height: strokeOption * 2 + 4,
-                          width: strokeOption * 2 + 4,
-                        }}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-=======
                 {activeToolOptions === 'background' && (
                   <View className="flex-row flex-wrap justify-center">
                     {backgroundOptions.map((option) => {
@@ -1275,7 +1245,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
                     ))}
                   </View>
                 )}
->>>>>>> origin/main
               </View>
             )}
           </View>
@@ -1284,34 +1253,10 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
         </View>
       </View>
 
-<<<<<<< HEAD
-      <View className="flex-1 p-4" style={{ backgroundColor: palette.background }}>
-        <View
-          className="overflow-hidden border"
-          style={{
-            backgroundColor: palette.surface,
-            borderColor: palette.border,
-            flex: 1,
-            borderRadius: 8,
-            ...Platform.select({
-              web: {
-                boxShadow: `0px 8px 16px ${withAlpha(palette.teal, 0.08)}`,
-              },
-              default: {
-                shadowColor: palette.teal,
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.08,
-                shadowRadius: 16,
-                elevation: 2,
-              },
-            }),
-          }}
-=======
       <View className="flex-1 bg-canvas">
         <View
           className="bg-surface overflow-hidden"
           style={{ flex: 1 }}
->>>>>>> origin/main
           onLayout={handleCanvasLayout}
           {...panResponder.panHandlers}>
           <Svg
@@ -1539,7 +1484,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({ date, journalType,
   );
 };
 
-<<<<<<< HEAD
 const createStyles = (palette: ThemePalette) =>
   StyleSheet.create({
     moreMenu: {
@@ -1577,72 +1521,33 @@ const createStyles = (palette: ThemePalette) =>
         },
       }),
     },
+    previewOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: withAlpha(palette.ink, 0.45),
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 18,
+    },
+    previewCard: {
+      alignSelf: 'center',
+      width: '100%',
+      maxWidth: 760,
+      maxHeight: '100%' as const,
+      ...Platform.select({
+        web: {
+          boxShadow: `0px 12px 28px ${withAlpha(palette.ink, 0.24)}`,
+        },
+        default: {
+          elevation: 16,
+          shadowColor: palette.ink,
+          shadowOffset: { width: 0, height: 12 },
+          shadowOpacity: 0.24,
+          shadowRadius: 28,
+        },
+      }),
+    },
   });
-=======
-const styles = StyleSheet.create({
-  moreMenu: {
-    position: 'absolute',
-    right: -73,
-    top: 54,
-    width: 190,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
-      },
-      default: {
-        elevation: 12,
-        shadowColor: palette.ink,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
-  toolOptionsMenu: {
-    left: '50%',
-    position: 'absolute',
-    top: 54,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 8px 18px rgba(27, 58, 52, 0.14)',
-      },
-      default: {
-        elevation: 12,
-        shadowColor: palette.ink,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
-  previewOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(27, 58, 52, 0.45)',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 18,
-  },
-  previewCard: {
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: 760,
-    maxHeight: '100%',
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 12px 28px rgba(27, 58, 52, 0.24)',
-      },
-      default: {
-        elevation: 16,
-        shadowColor: palette.ink,
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.24,
-        shadowRadius: 28,
-      },
-    }),
-  },
-});
->>>>>>> origin/main

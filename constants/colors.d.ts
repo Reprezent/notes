@@ -2,6 +2,7 @@ declare const colors: {
   readonly canvas: string;
   readonly paper: string;
   readonly surface: string;
+  readonly surfaceWarm: string;
   readonly ink: string;
   readonly muted: string;
   readonly subtle: string;
