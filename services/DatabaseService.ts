@@ -1,6 +1,11 @@
 import { Platform } from 'react-native';
 import { dbLog } from './Logger';
-import { JournalTypeId } from './JournalTypes';
+import {
+  DEFAULT_JOURNAL_BACKGROUND_STYLE,
+  isJournalBackgroundStyle,
+  JournalBackgroundStyle,
+  JournalTypeId,
+} from './JournalTypes';
 import { webDatabaseService } from './WebDatabaseService';
 
 export interface JournalEntry {
@@ -34,6 +39,11 @@ class DatabaseService {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(date, journal_type)
+      );
+      CREATE TABLE IF NOT EXISTS journal_preferences (
+        journal_type TEXT PRIMARY KEY,
+        background_style TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
       INSERT OR IGNORE INTO journal_entries (date, journal_type, data, created_at, updated_at)
       SELECT date, 'daily-diary', data, created_at, updated_at FROM drawings;
@@ -97,6 +107,43 @@ class DatabaseService {
       date,
       journalType,
     ]);
+  }
+
+  async getJournalBackground(journalType: JournalTypeId): Promise<JournalBackgroundStyle> {
+    if (Platform.OS === 'web') {
+      return webDatabaseService.getJournalBackground(journalType);
+    }
+    if (!this.db) await this.initDatabase();
+    const result = (await this.db!.getFirstAsync(
+      'SELECT background_style FROM journal_preferences WHERE journal_type = ?',
+      [journalType]
+    )) as { background_style: string } | null;
+
+    if (!result) {
+      return DEFAULT_JOURNAL_BACKGROUND_STYLE;
+    }
+
+    return isJournalBackgroundStyle(result.background_style)
+      ? result.background_style
+      : DEFAULT_JOURNAL_BACKGROUND_STYLE;
+  }
+
+  async saveJournalBackground(
+    journalType: JournalTypeId,
+    backgroundStyle: JournalBackgroundStyle
+  ): Promise<void> {
+    if (Platform.OS === 'web') {
+      return webDatabaseService.saveJournalBackground(journalType, backgroundStyle);
+    }
+    if (!this.db) await this.initDatabase();
+    await this.db!.runAsync(
+      `INSERT INTO journal_preferences (journal_type, background_style, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(journal_type) DO UPDATE SET
+         background_style = excluded.background_style,
+         updated_at = CURRENT_TIMESTAMP`,
+      [journalType, backgroundStyle]
+    );
   }
 }
 

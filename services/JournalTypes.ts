@@ -1,4 +1,5 @@
 export type JournalTypeId = 'daily-diary' | 'gratitude' | 'artists-notes' | 'inspiration';
+export type JournalBackgroundStyle = 'ruled' | 'grid' | 'dot' | 'blank';
 
 export interface JournalType {
   id: JournalTypeId;
@@ -39,8 +40,14 @@ export const JOURNAL_TYPES: readonly JournalType[] = [
   },
 ];
 
+export const JOURNAL_BACKGROUND_STYLES = ['ruled', 'grid', 'dot', 'blank'] as const;
+export const DEFAULT_JOURNAL_BACKGROUND_STYLE: JournalBackgroundStyle = 'grid';
+
 export const isJournalType = (value: string): value is JournalTypeId =>
   JOURNAL_TYPES.some((journalType) => journalType.id === value);
+
+export const isJournalBackgroundStyle = (value: string): value is JournalBackgroundStyle =>
+  JOURNAL_BACKGROUND_STYLES.some((backgroundStyle) => backgroundStyle === value);
 
 export const getJournalType = (id: JournalTypeId): JournalType => {
   const journalType = JOURNAL_TYPES.find((type) => type.id === id);

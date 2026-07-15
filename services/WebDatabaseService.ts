@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isJournalType, JournalTypeId } from './JournalTypes';
+import {
+  DEFAULT_JOURNAL_BACKGROUND_STYLE,
+  isJournalBackgroundStyle,
+  isJournalType,
+  JournalBackgroundStyle,
+  JournalTypeId,
+} from './JournalTypes';
 
 export interface Drawing {
   id?: number;
@@ -13,6 +19,10 @@ export interface Drawing {
 class WebDatabaseService {
   private getStorageKey(date: string, journalType: JournalTypeId): string {
     return `journal:${journalType}:${date}`;
+  }
+
+  private getBackgroundStorageKey(journalType: JournalTypeId): string {
+    return `journal-background:${journalType}`;
   }
 
   async initDatabase(): Promise<void> {
@@ -134,6 +144,33 @@ class WebDatabaseService {
       await AsyncStorage.removeItem(key);
     } catch (error) {
       console.error('Error deleting journal entry:', error);
+      throw error;
+    }
+  }
+
+  async getJournalBackground(journalType: JournalTypeId): Promise<JournalBackgroundStyle> {
+    try {
+      const result = await AsyncStorage.getItem(this.getBackgroundStorageKey(journalType));
+
+      if (!result) {
+        return DEFAULT_JOURNAL_BACKGROUND_STYLE;
+      }
+
+      return isJournalBackgroundStyle(result) ? result : DEFAULT_JOURNAL_BACKGROUND_STYLE;
+    } catch (error) {
+      console.error('Error loading journal background:', error);
+      throw error;
+    }
+  }
+
+  async saveJournalBackground(
+    journalType: JournalTypeId,
+    backgroundStyle: JournalBackgroundStyle
+  ): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.getBackgroundStorageKey(journalType), backgroundStyle);
+    } catch (error) {
+      console.error('Error saving journal background:', error);
       throw error;
     }
   }
