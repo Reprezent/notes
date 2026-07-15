@@ -35,6 +35,9 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Configure Gradle JVM memory
+        run: sed -i 's/org\.gradle\.jvmargs=.*/org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError/' android/gradle.properties
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
