@@ -22,7 +22,7 @@ static const char *error_code(int32_t status) {
 
 static jstring error_json(JNIEnv *env, int32_t status) {
   const char *code = error_code(status);
-  char json[64];
+  char json[128];
   snprintf(json, sizeof(json), "{\"code\":\"%s\"}", code);
   return (*env)->NewStringUTF(env, json);
 }
