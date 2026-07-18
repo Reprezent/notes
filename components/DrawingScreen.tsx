@@ -595,6 +595,16 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     }
   };
 
+  const handleUndo = () => {
+    if (paths.length === 0) {
+      return;
+    }
+
+    const newPaths = paths.slice(0, -1);
+    setPaths(newPaths);
+    void saveDrawing(newPaths);
+  };
+
   const handleWheel = (event: WheelEvent) => {
     const target = event.target as Element | null;
     const svgElement = target?.closest?.('svg');
@@ -1109,50 +1119,54 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
           <View className="flex-1 flex-row items-center pr-2">
             <TouchableOpacity
               onPress={onBack}
-              className="mr-3 h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: palette.tealSoft }}>
-              <Ionicons name="arrow-back" size={23} color={palette.teal} />
+              accessibilityLabel="Back to journals"
+              className="mr-3 h-11 w-11 items-center justify-center">
+              <Ionicons name="arrow-back" size={25} color={palette.ink} />
             </TouchableOpacity>
             <View className="flex-1">
-              <Text className="text-base font-bold text-ink" numberOfLines={1}>
+              <Text className="text-xl font-bold text-ink" numberOfLines={1}>
                 {journal.name}
               </Text>
-              <Text className="text-xs text-muted" numberOfLines={1}>
+              <Text className="text-sm text-muted" numberOfLines={1}>
                 {formattedDate}
               </Text>
             </View>
           </View>
 
-          <View
-            className="flex-row rounded-lg p-1"
-            style={{ backgroundColor: palette.background, position: 'relative' }}>
+          <View className="flex-row items-center" style={{ position: 'relative' }}>
             <TouchableOpacity
-              onPress={() => handleToolSelect('pen')}
-              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: selectedTool === 'pen' ? palette.teal : 'transparent' }}>
-              <Ionicons
-                name="pencil-outline"
-                size={22}
-                color={selectedTool === 'pen' ? palette.surface : palette.muted}
-              />
+              onPress={handleUndo}
+              disabled={paths.length === 0}
+              accessibilityLabel="Undo last stroke"
+              className="mr-2 h-11 w-11 items-center justify-center rounded-full"
+              style={{ opacity: paths.length === 0 ? 0.4 : 1 }}>
+              <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => handleToolSelect('eraser')}
-              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
-              style={{
-                backgroundColor: selectedTool === 'eraser' ? palette.secondary : 'transparent',
-              }}>
+              accessibilityLabel="Search drawing"
+              className="mr-2 h-11 w-11 items-center justify-center rounded-full">
+              <Ionicons name="search-outline" size={25} color={palette.ink} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleToolSelect('pen')}
+              accessibilityLabel="Pen colors and stroke width"
+              className="mr-3 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: palette.teal }}>
               <Ionicons
-                name="remove-circle-outline"
-                size={22}
-                color={selectedTool === 'eraser' ? palette.surface : palette.muted}
+                name="pencil-outline"
+                size={25}
+                color={palette.surface}
               />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleMoreToggle}
-              className="h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: isMoreMenuOpen ? palette.tealSoft : 'transparent' }}>
-              <Ionicons name="ellipsis-horizontal" size={23} color={palette.muted} />
+              accessibilityLabel="More drawing options"
+              className="h-11 w-11 items-center justify-center rounded-full border"
+              style={{
+                backgroundColor: isMoreMenuOpen ? palette.tealSoft : palette.paper,
+                borderColor: palette.border,
+              }}>
+              <Ionicons name="ellipsis-horizontal" size={23} color={palette.ink} />
             </TouchableOpacity>
 
             {isMoreMenuOpen && (
@@ -1162,6 +1176,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
                   styles.moreMenu,
                   { backgroundColor: palette.paper, borderColor: palette.border },
                 ]}>
+                <TouchableOpacity
+                  onPress={() => handleToolSelect('eraser')}
+                  className="flex-row items-center rounded-lg px-3 py-3">
+                  <Ionicons name="remove-circle-outline" size={20} color={palette.teal} />
+                  <Text className="ml-3 text-sm font-bold text-ink">Eraser</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCameraAction}
                   onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
