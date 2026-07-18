@@ -72,7 +72,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          short_sha="$(printf '%s' '${{ github.sha }}' | cut -c1-7)"
+          short_sha="$(echo '${{ github.sha }}' | cut -c1-7)"
           tag="notes-android-${{ github.run_number }}-${short_sha}"
           gh release create "$tag" \
             --title "Android release $tag" \
