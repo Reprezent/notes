@@ -91,6 +91,7 @@ interface PersistedDrawing {
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const disabledToolbarControlOpacity = 0.4;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -606,7 +607,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
   };
 
   const handleSearchAction = () => {
-    Alert.alert('Search drawing', 'Search is not available for canvas drawings.');
+    Alert.alert('Canvas Search Unavailable', 'Search is not available for canvas drawings.');
   };
 
   const handleWheel = (event: WheelEvent) => {
@@ -1143,7 +1144,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               disabled={paths.length === 0}
               accessibilityLabel="Undo last stroke"
               className="mr-2 h-11 w-11 items-center justify-center rounded-full"
-              style={{ opacity: paths.length === 0 ? 0.4 : 1 }}>
+              style={{ opacity: paths.length === 0 ? disabledToolbarControlOpacity : 1 }}>
               <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
             <TouchableOpacity
