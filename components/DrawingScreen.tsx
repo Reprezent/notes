@@ -1143,6 +1143,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               onPress={handleUndo}
               disabled={paths.length === 0}
               accessibilityLabel="Undo last stroke"
+              accessibilityState={{ disabled: paths.length === 0 }}
               className="mr-2 h-11 w-11 items-center justify-center rounded-full"
               style={{ opacity: paths.length === 0 ? disabledToolbarControlOpacity : 1 }}>
               <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
@@ -1150,6 +1151,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             <TouchableOpacity
               onPress={handleSearchAction}
               accessibilityLabel="Search drawing"
+              accessibilityHint="Search is unavailable for canvas drawings."
               className="mr-2 h-11 w-11 items-center justify-center rounded-full">
               <Ionicons name="search-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
