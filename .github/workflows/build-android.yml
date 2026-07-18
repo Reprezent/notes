@@ -79,11 +79,11 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub release
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="android-${{ github.run_number }}-${GITHUB_SHA:0:7}"
+          tag="android-${{ github.run_number }}-${{ github.sha }}"
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
             --title "Android release $tag" \
