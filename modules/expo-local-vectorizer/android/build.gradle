@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+expoModule {
+  canBePublished false
+}
+
+android {
+  namespace 'expo.modules.localvectorizer'
+
+  defaultConfig {
+    minSdk 24
+    externalNativeBuild {
+      cmake {
+        cppFlags '-std=c++17'
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path file('CMakeLists.txt')
+    }
+  }
+}

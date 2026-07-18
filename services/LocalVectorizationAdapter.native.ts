@@ -26,6 +26,11 @@ export const localVectorizationService: LocalVectorizationServiceContract = {
     });
     try {
       assertValidTraceMaskRequest(request);
+      if (!ExpoLocalVectorizer) {
+        throw new Error(
+          'Image vectorization is unavailable because this build does not include it. Rebuild the app with the vectorizer module included to enable this feature.'
+        );
+      }
       vectorizationLog.debug('Native trace request validated');
       const { settings } = request;
       const engineStartedAt = Date.now();
@@ -33,14 +38,16 @@ export const localVectorizationService: LocalVectorizationServiceContract = {
         request.pixels,
         request.width,
         request.height,
-        settings.threshold,
-        settings.sensitivity,
-        settings.speckleMinArea,
-        turnPolicyCode[settings.turnPolicy],
-        settings.cornerThreshold,
-        settings.optimizeCurve,
-        settings.maxPathCount,
-        settings.maxOutputBytes
+        {
+          threshold: settings.threshold,
+          sensitivity: settings.sensitivity,
+          speckleMinArea: settings.speckleMinArea,
+          turnPolicy: turnPolicyCode[settings.turnPolicy],
+          cornerThreshold: settings.cornerThreshold,
+          optimizeCurve: settings.optimizeCurve,
+          maxPathCount: settings.maxPathCount,
+          maxOutputBytes: settings.maxOutputBytes,
+        }
       );
       vectorizationLog.info('Native trace engine completed', {
         responseBytes: json.length,

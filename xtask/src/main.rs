@@ -27,10 +27,13 @@ fn main() -> Result<()> {
     let command = env::args().nth(1).unwrap_or_default();
     match command.as_str() {
         "build-all" => build_all(),
+        "build-android" => build_android(),
         "build-web" => build_web(),
         "verify-artifacts" => verify_artifacts(),
         "verify-web" => verify_web_artifacts(),
-        _ => bail!("usage: cargo xtask <build-all|build-web|verify-artifacts|verify-web>"),
+        _ => bail!(
+            "usage: cargo xtask <build-all|build-android|build-web|verify-artifacts|verify-web>"
+        ),
     }
 }
 
@@ -118,6 +121,11 @@ fn build_web() -> Result<()> {
     fs::create_dir_all(&artifact_dir)?;
     build_web_artifact(&artifact_dir)?;
     verify_web_artifacts()
+}
+
+fn build_android() -> Result<()> {
+    test_workspace()?;
+    build_android_artifacts(&artifacts_dir())
 }
 
 fn test_workspace() -> Result<()> {
@@ -263,6 +271,7 @@ fn build_android_artifacts(artifact_dir: &Path) -> Result<()> {
             "x86_64-linux-android24-clang",
             "x86_64",
         ),
+        ("i686-linux-android", "i686-linux-android24-clang", "x86"),
     ];
 
     for (target, linker, abi) in targets {
@@ -286,7 +295,7 @@ fn build_android_artifacts(artifact_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn required_artifacts() -> [&'static str; 7] {
+fn required_artifacts() -> [&'static str; 9] {
     [
         "include/tracer_ffi.h",
         "web/trace.js",
@@ -295,15 +304,14 @@ fn required_artifacts() -> [&'static str; 7] {
         "ios/iphonesimulator/libtracer_ffi.a",
         "android/arm64-v8a/libtracer_ffi.a",
         "android/armeabi-v7a/libtracer_ffi.a",
+        "android/x86/libtracer_ffi.a",
+        "android/x86_64/libtracer_ffi.a",
     ]
 }
 
 fn write_manifest(artifact_dir: &Path) -> Result<()> {
     let mut artifacts = BTreeMap::new();
-    for relative_path in required_artifacts()
-        .into_iter()
-        .chain(std::iter::once("android/x86_64/libtracer_ffi.a"))
-    {
+    for relative_path in required_artifacts() {
         let artifact = artifact_dir.join(relative_path);
         artifacts.insert(
             relative_path.to_owned(),
@@ -346,10 +354,7 @@ fn verify_artifacts() -> Result<()> {
         );
     }
 
-    for required in required_artifacts()
-        .into_iter()
-        .chain(std::iter::once("android/x86_64/libtracer_ffi.a"))
-    {
+    for required in required_artifacts() {
         let entry = manifest
             .artifacts
             .get(required)

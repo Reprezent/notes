@@ -16,6 +16,8 @@ web-build/
 
 ios
 android
+!modules/expo-local-vectorizer/android/
+!modules/expo-local-vectorizer/android/**
 modules/expo-local-vectorizer/artifacts/
 
 # macOS
