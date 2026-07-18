@@ -1152,11 +1152,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               accessibilityLabel="Pen colors and stroke width"
               className="mr-3 h-14 w-14 items-center justify-center rounded-2xl"
               style={{ backgroundColor: palette.teal }}>
-              <Ionicons
-                name="pencil-outline"
-                size={25}
-                color={palette.surface}
-              />
+              <Ionicons name="pencil-outline" size={25} color={palette.surface} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleMoreToggle}
