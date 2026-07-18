@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload installable APK
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: notes-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload Android App Bundle
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: notes-android-bundle
           path: android/app/build/outputs/bundle/release/app-release.aab
