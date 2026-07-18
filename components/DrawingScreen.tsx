@@ -606,10 +606,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     void saveDrawing(newPaths);
   };
 
-  const handleSearchAction = () => {
-    Alert.alert('Canvas Search Unavailable', 'Search is not available for canvas drawings.');
-  };
-
   const handleWheel = (event: WheelEvent) => {
     const target = event.target as Element | null;
     const svgElement = target?.closest?.('svg');
@@ -1142,6 +1138,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             <TouchableOpacity
               onPress={handleUndo}
               disabled={paths.length === 0}
+              accessibilityRole="button"
               accessibilityLabel="Undo last stroke"
               accessibilityState={{ disabled: paths.length === 0 }}
               className="mr-2 h-11 w-11 items-center justify-center rounded-full"
@@ -1149,11 +1146,14 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleSearchAction}
-              accessibilityLabel="Search drawing"
+              disabled
+              accessibilityRole="button"
+              accessibilityLabel="Search drawing unavailable"
               accessibilityHint="Search is unavailable for canvas drawings."
-              className="mr-2 h-11 w-11 items-center justify-center rounded-full">
-              <Ionicons name="search-outline" size={25} color={palette.ink} />
+              accessibilityState={{ disabled: true }}
+              className="mr-2 h-11 w-11 items-center justify-center rounded-full"
+              style={{ opacity: disabledToolbarControlOpacity }}>
+              <Ionicons name="search-outline" size={25} color={palette.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleToolSelect('pen')}
