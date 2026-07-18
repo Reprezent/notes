@@ -271,6 +271,7 @@ fn build_android_artifacts(artifact_dir: &Path) -> Result<()> {
             "x86_64-linux-android24-clang",
             "x86_64",
         ),
+        ("i686-linux-android", "i686-linux-android24-clang", "x86"),
     ];
 
     for (target, linker, abi) in targets {
@@ -294,7 +295,7 @@ fn build_android_artifacts(artifact_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn required_artifacts() -> [&'static str; 7] {
+fn required_artifacts() -> [&'static str; 8] {
     [
         "include/tracer_ffi.h",
         "web/trace.js",
@@ -303,6 +304,7 @@ fn required_artifacts() -> [&'static str; 7] {
         "ios/iphonesimulator/libtracer_ffi.a",
         "android/arm64-v8a/libtracer_ffi.a",
         "android/armeabi-v7a/libtracer_ffi.a",
+        "android/x86/libtracer_ffi.a",
     ]
 }
 
@@ -310,7 +312,7 @@ fn write_manifest(artifact_dir: &Path) -> Result<()> {
     let mut artifacts = BTreeMap::new();
     for relative_path in required_artifacts()
         .into_iter()
-        .chain(std::iter::once("android/x86_64/libtracer_ffi.a"))
+        .chain(["android/x86_64/libtracer_ffi.a"].into_iter())
     {
         let artifact = artifact_dir.join(relative_path);
         artifacts.insert(
@@ -356,7 +358,7 @@ fn verify_artifacts() -> Result<()> {
 
     for required in required_artifacts()
         .into_iter()
-        .chain(std::iter::once("android/x86_64/libtracer_ffi.a"))
+        .chain(["android/x86_64/libtracer_ffi.a"].into_iter())
     {
         let entry = manifest
             .artifacts
