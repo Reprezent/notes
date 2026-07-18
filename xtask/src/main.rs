@@ -295,7 +295,7 @@ fn build_android_artifacts(artifact_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn required_artifacts() -> [&'static str; 8] {
+fn required_artifacts() -> [&'static str; 9] {
     [
         "include/tracer_ffi.h",
         "web/trace.js",
@@ -305,15 +305,13 @@ fn required_artifacts() -> [&'static str; 8] {
         "android/arm64-v8a/libtracer_ffi.a",
         "android/armeabi-v7a/libtracer_ffi.a",
         "android/x86/libtracer_ffi.a",
+        "android/x86_64/libtracer_ffi.a",
     ]
 }
 
 fn write_manifest(artifact_dir: &Path) -> Result<()> {
     let mut artifacts = BTreeMap::new();
-    for relative_path in required_artifacts()
-        .into_iter()
-        .chain(["android/x86_64/libtracer_ffi.a"].into_iter())
-    {
+    for relative_path in required_artifacts() {
         let artifact = artifact_dir.join(relative_path);
         artifacts.insert(
             relative_path.to_owned(),
@@ -356,10 +354,7 @@ fn verify_artifacts() -> Result<()> {
         );
     }
 
-    for required in required_artifacts()
-        .into_iter()
-        .chain(["android/x86_64/libtracer_ffi.a"].into_iter())
-    {
+    for required in required_artifacts() {
         let entry = manifest
             .artifacts
             .get(required)
