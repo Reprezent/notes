@@ -1124,7 +1124,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
           <View className="flex-1 flex-row items-center pr-2">
             <TouchableOpacity
               onPress={onBack}
-              accessibilityLabel="Back to journals"
+              accessibilityLabel="Go back"
               className="mr-3 h-11 w-11 items-center justify-center">
               <Ionicons name="arrow-back" size={25} color={palette.ink} />
             </TouchableOpacity>
@@ -1155,7 +1155,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleToolSelect('pen')}
-              accessibilityLabel="Pen colors and stroke width"
+              accessibilityLabel="Pen tool and color options"
               className="mr-3 h-14 w-14 items-center justify-center rounded-2xl"
               style={{ backgroundColor: palette.teal }}>
               <Ionicons name="pencil-outline" size={25} color={palette.surface} />
