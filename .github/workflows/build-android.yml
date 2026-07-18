@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -66,3 +66,16 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="android-${{ github.run_number }}"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "Android release $tag" \
+            --generate-notes \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            android/app/build/outputs/bundle/release/app-release.aab
