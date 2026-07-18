@@ -605,6 +605,10 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     void saveDrawing(newPaths);
   };
 
+  const handleSearchAction = () => {
+    Alert.alert('Search drawing', 'Search is not available for canvas drawings.');
+  };
+
   const handleWheel = (event: WheelEvent) => {
     const target = event.target as Element | null;
     const svgElement = target?.closest?.('svg');
@@ -1143,6 +1147,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
             <TouchableOpacity
+              onPress={handleSearchAction}
               accessibilityLabel="Search drawing"
               className="mr-2 h-11 w-11 items-center justify-center rounded-full">
               <Ionicons name="search-outline" size={25} color={palette.ink} />
