@@ -83,9 +83,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="android-${{ github.run_number }}-${{ github.sha }}"
+          short_sha="$(printf '%s' '${{ github.sha }}' | cut -c1-7)"
+          tag="android-${{ github.run_number }}-${short_sha}"
           gh release create "$tag" \
-            --target "$GITHUB_SHA" \
             --title "Android release $tag" \
             --generate-notes \
             android/app/build/outputs/apk/release/app-release.apk \
