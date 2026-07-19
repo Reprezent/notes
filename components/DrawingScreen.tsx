@@ -93,6 +93,7 @@ interface PersistedDrawing {
 
 const strokeWidths = [1, 3, 6, 10];
 const ERASER_HIT_TARGET_MULTIPLIER = 3;
+let nextDrawingPathId = 0;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -115,7 +116,9 @@ const createDrawingPathId = () => {
     return crypto.randomUUID();
   }
 
-  return `path-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `path-${Date.now().toString(36)}-${nextDrawingPathId++}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
 };
 
 interface SliderControlProps {
@@ -284,10 +287,27 @@ const normalizeDrawingPaths = (value: unknown): DrawingPath[] => {
     return [];
   }
 
-  return value.filter(isDrawingPath).map((path, index) => ({
-    ...path,
-    id: path.id ?? `legacy-${index}`,
-  }));
+  const legacyIdCounts = new Map<string, number>();
+  return value.filter(isDrawingPath).map((path) => {
+    if (path.id) {
+      return path;
+    }
+
+    const legacyPathKey = JSON.stringify([
+      path.path,
+      path.color,
+      path.strokeWidth,
+      path.fillColor,
+      path.fillRule,
+      path.transform,
+    ]);
+    const occurrence = legacyIdCounts.get(legacyPathKey) ?? 0;
+    legacyIdCounts.set(legacyPathKey, occurrence + 1);
+    return {
+      ...path,
+      id: `legacy-${legacyPathKey}-${occurrence}`,
+    };
+  });
 };
 
 const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
