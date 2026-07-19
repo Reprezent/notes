@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -367,22 +367,25 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
   const isPanningRef = useRef(isPanning);
   const lastPanPointRef = useRef(lastPanPoint);
 
-  const runVectorizationPass = async (
-    request: DecodedImageMask,
-    settings: TraceSettings
-  ): Promise<CompletedVectorizationResponse> => {
-    const response = await LocalVectorizationService.traceMask({
-      ...request,
-      settings,
-    });
+  const runVectorizationPass = useCallback(
+    async (
+      request: DecodedImageMask,
+      settings: TraceSettings
+    ): Promise<CompletedVectorizationResponse> => {
+      const response = await LocalVectorizationService.traceMask({
+        ...request,
+        settings,
+      });
 
-    if (response.kind !== 'completed') {
-      throw new Error('Local vectorization is not available yet.');
-    }
-    return response;
-  };
+      if (response.kind !== 'completed') {
+        throw new Error('Local vectorization is not available yet.');
+      }
+      return response;
+    },
+    []
+  );
 
-  const warningForMaskCoverage = (mask: DecodedImageMask): string | null => {
+  const warningForMaskCoverage = useCallback((mask: DecodedImageMask): string | null => {
     if (Array.isArray(mask.warnings) && mask.warnings.length > 0) {
       return mask.warnings[0];
     }
@@ -397,7 +400,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
       return 'Detected too much foreground. Increase threshold to avoid blob output.';
     }
     return null;
-  };
+  }, []);
 
   const startVectorizationFromImage = async (base64: string, mimeType?: string | null) => {
     if (isVectorizing) {
@@ -863,14 +866,17 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     ]);
   };
 
-  const runPreviewPass = async (
-    sourceImage: { base64: string; mimeType?: string | null },
-    settings: TraceSettings
-  ): Promise<{ request: DecodedImageMask; response: CompletedVectorizationResponse }> => {
-    const request = await decodeImageToMask(sourceImage.base64, settings, sourceImage.mimeType);
-    const response = await runVectorizationPass(request, settings);
-    return { request, response };
-  };
+  const runPreviewPass = useCallback(
+    async (
+      sourceImage: { base64: string; mimeType?: string | null },
+      settings: TraceSettings
+    ): Promise<{ request: DecodedImageMask; response: CompletedVectorizationResponse }> => {
+      const request = await decodeImageToMask(sourceImage.base64, settings, sourceImage.mimeType);
+      const response = await runVectorizationPass(request, settings);
+      return { request, response };
+    },
+    [runVectorizationPass]
+  );
 
   const closeVectorPreview = () => {
     previewRunIdRef.current += 1;
@@ -880,51 +886,54 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     setIsPreviewProcessing(false);
   };
 
-  const rerunPreviewWithSettings = async (
-    sourceImage: { base64: string; mimeType?: string | null },
-    settings: TraceSettings
-  ) => {
-    const runId = previewRunIdRef.current + 1;
-    previewRunIdRef.current = runId;
+  const rerunPreviewWithSettings = useCallback(
+    async (sourceImage: { base64: string; mimeType?: string | null }, settings: TraceSettings) => {
+      const runId = previewRunIdRef.current + 1;
+      previewRunIdRef.current = runId;
 
-    setIsPreviewProcessing(true);
-    setPreviewErrorMessage(null);
-    try {
-      const { request, response } = await runPreviewPass(sourceImage, settings);
-      setVectorPreview((current) => {
-        if (!current || previewRunIdRef.current !== runId) {
-          return current;
+      setIsPreviewProcessing(true);
+      setPreviewErrorMessage(null);
+      try {
+        const { request, response } = await runPreviewPass(sourceImage, settings);
+        setVectorPreview((current) => {
+          if (!current || previewRunIdRef.current !== runId) {
+            return current;
+          }
+
+          return {
+            ...current,
+            request,
+            settings,
+            response,
+          };
+        });
+        if (previewRunIdRef.current === runId) {
+          setPreviewWarningMessage(warningForMaskCoverage(request));
         }
+      } catch (error) {
+        const message =
+          error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
+            ? 'Those settings exceed local trace limits. Try reducing detail.'
+            : error instanceof Error
+              ? error.message
+              : 'Preview vectorization failed.';
+        if (previewRunIdRef.current === runId) {
+          setPreviewErrorMessage(message);
+        }
+      } finally {
+        if (previewRunIdRef.current === runId) {
+          setIsPreviewProcessing(false);
+        }
+      }
+    },
+    [runPreviewPass, warningForMaskCoverage]
+  );
 
-        return {
-          ...current,
-          request,
-          settings,
-          response,
-        };
-      });
-      if (previewRunIdRef.current === runId) {
-        setPreviewWarningMessage(warningForMaskCoverage(request));
-      }
-    } catch (error) {
-      const message =
-        error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
-          ? 'Those settings exceed local trace limits. Try reducing detail.'
-          : error instanceof Error
-            ? error.message
-            : 'Preview vectorization failed.';
-      if (previewRunIdRef.current === runId) {
-        setPreviewErrorMessage(message);
-      }
-    } finally {
-      if (previewRunIdRef.current === runId) {
-        setIsPreviewProcessing(false);
-      }
-    }
-  };
+  const previewSourceImage = vectorPreview?.sourceImage;
+  const previewSettings = vectorPreview?.settings;
 
   useEffect(() => {
-    if (!vectorPreview) {
+    if (!previewSourceImage || !previewSettings) {
       return;
     }
 
@@ -934,20 +943,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     }
 
     const timeout = setTimeout(() => {
-      void rerunPreviewWithSettings(vectorPreview.sourceImage, vectorPreview.settings);
+      void rerunPreviewWithSettings(previewSourceImage, previewSettings);
     }, 220);
 
     return () => {
       clearTimeout(timeout);
     };
-  }, [
-    vectorPreview?.settings.threshold,
-    vectorPreview?.settings.sensitivity,
-    vectorPreview?.settings.speckleMinArea,
-    vectorPreview?.settings.cornerThreshold,
-    vectorPreview?.settings.turnPolicy,
-    vectorPreview?.settings.optimizeCurve,
-  ]);
+  }, [previewSourceImage, previewSettings, rerunPreviewWithSettings]);
 
   const updatePreviewSettings = (patch: Partial<TraceSettings>) => {
     setVectorPreview((current) => {
@@ -1134,7 +1136,9 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             </View>
           </View>
 
-          <View className="ml-auto flex-row items-center justify-end" style={{ position: 'relative' }}>
+          <View
+            className="ml-auto flex-row items-center justify-end"
+            style={{ position: 'relative' }}>
             <TouchableOpacity
               onPress={handleUndo}
               disabled={paths.length === 0}
