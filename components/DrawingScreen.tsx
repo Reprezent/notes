@@ -78,6 +78,7 @@ interface DrawingScreenProps {
 }
 
 interface DrawingPath {
+  id: string;
   path: string;
   color: string;
   strokeWidth: number;
@@ -91,6 +92,7 @@ interface PersistedDrawing {
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const ERASER_HIT_TARGET_MULTIPLIER = 3;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -257,6 +259,7 @@ const isDrawingPath = (value: unknown): value is DrawingPath => {
 
   const candidate = value as Record<string, unknown>;
   return (
+    (candidate.id === undefined || typeof candidate.id === 'string') &&
     typeof candidate.path === 'string' &&
     typeof candidate.color === 'string' &&
     typeof candidate.strokeWidth === 'number' &&
@@ -268,10 +271,21 @@ const isDrawingPath = (value: unknown): value is DrawingPath => {
   );
 };
 
+const normalizeDrawingPaths = (value: unknown): DrawingPath[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isDrawingPath).map((path, index) => ({
+    ...path,
+    id: path.id ?? `legacy-${index}`,
+  }));
+};
+
 const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
   if (Array.isArray(value)) {
     return {
-      paths: value.filter(isDrawingPath),
+      paths: normalizeDrawingPaths(value),
     };
   }
 
@@ -281,7 +295,7 @@ const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
 
   const candidate = value as Record<string, unknown>;
   return {
-    paths: Array.isArray(candidate.paths) ? candidate.paths.filter(isDrawingPath) : [],
+    paths: normalizeDrawingPaths(candidate.paths),
   };
 };
 
@@ -309,6 +323,7 @@ const drawingPathsFromVectorization = (
 ): DrawingPath[] => {
   const transform = fitViewBoxToCanvas(response.viewBox, canvasWidth, canvasHeight);
   return response.paths.map((record) => ({
+    id: crypto.randomUUID(),
     path: record.path,
     color,
     strokeWidth: 0,
@@ -803,6 +818,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
           pathLength: currentPath.length,
         });
         const newDrawingPath: DrawingPath = {
+          id: crypto.randomUUID(),
           path: currentPath,
           color: selectedColor,
           strokeWidth,
@@ -1341,7 +1357,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
 
             {paths.map((drawingPath, index) => (
               <Path
-                key={index}
+                key={drawingPath.id}
                 d={drawingPath.path}
                 stroke={drawingPath.fillColor ? 'none' : drawingPath.color}
                 strokeWidth={drawingPath.strokeWidth}
@@ -1357,10 +1373,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             {selectedTool === 'eraser' &&
               paths.map((drawingPath, index) => (
                 <Path
-                  key={`eraser-${index}`}
+                  key={`eraser-${drawingPath.id}`}
                   d={drawingPath.path}
                   stroke="transparent"
-                  strokeWidth={Math.max(drawingPath.strokeWidth, strokeWidth * 3)}
+                  strokeWidth={
+                    Math.max(drawingPath.strokeWidth, strokeWidth * ERASER_HIT_TARGET_MULTIPLIER)
+                  }
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill={drawingPath.fillColor ? 'transparent' : 'none'}
