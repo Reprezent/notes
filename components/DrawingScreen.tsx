@@ -93,7 +93,6 @@ interface PersistedDrawing {
 
 const strokeWidths = [1, 3, 6, 10];
 const ERASER_HIT_TARGET_MULTIPLIER = 3;
-let nextDrawingPathId = 0;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -111,7 +110,13 @@ const roundToStep = (value: number, minimum: number, step: number) => {
   return minimum + steps * step;
 };
 
-const createDrawingPathId = () => `path-${Date.now()}-${nextDrawingPathId++}`;
+const createDrawingPathId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `path-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
 
 interface SliderControlProps {
   label: string;
@@ -741,8 +746,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     clearCanvas();
   };
 
-  const erasePath = (pathIndex: number) => {
-    const newPaths = paths.filter((_, index) => index !== pathIndex);
+  const erasePath = (pathId: string) => {
+    const newPaths = paths.filter((path) => path.id !== pathId);
     setPaths(newPaths);
     void saveDrawing(newPaths);
   };
@@ -1374,11 +1379,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             ))}
 
             {selectedTool === 'eraser' &&
-              paths.map((drawingPath, index) => (
+              paths.map((drawingPath) => (
                 <Path
                   key={`eraser-${drawingPath.id}`}
                   d={drawingPath.path}
                   stroke="transparent"
+                  // Keep the complete visible stroke within the eraser hit target.
                   strokeWidth={Math.max(
                     drawingPath.strokeWidth,
                     strokeWidth * ERASER_HIT_TARGET_MULTIPLIER
@@ -1389,7 +1395,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
                   fillRule={drawingPath.fillRule}
                   transform={drawingPath.transform}
                   vectorEffect="non-scaling-stroke"
-                  onPress={() => erasePath(index)}
+                  onPress={() => erasePath(drawingPath.id)}
                 />
               ))}
 
