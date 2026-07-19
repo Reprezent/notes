@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -94,6 +94,7 @@ interface PersistedDrawing {
 const strokeWidths = [1, 3, 6, 10];
 const ERASER_HIT_TARGET_MULTIPLIER = 3;
 let nextDrawingPathId = 0;
+const disabledToolbarControlOpacity = 0.4;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -418,22 +419,25 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
   const isPanningRef = useRef(isPanning);
   const lastPanPointRef = useRef(lastPanPoint);
 
-  const runVectorizationPass = async (
-    request: DecodedImageMask,
-    settings: TraceSettings
-  ): Promise<CompletedVectorizationResponse> => {
-    const response = await LocalVectorizationService.traceMask({
-      ...request,
-      settings,
-    });
+  const runVectorizationPass = useCallback(
+    async (
+      request: DecodedImageMask,
+      settings: TraceSettings
+    ): Promise<CompletedVectorizationResponse> => {
+      const response = await LocalVectorizationService.traceMask({
+        ...request,
+        settings,
+      });
 
-    if (response.kind !== 'completed') {
-      throw new Error('Local vectorization is not available yet.');
-    }
-    return response;
-  };
+      if (response.kind !== 'completed') {
+        throw new Error('Local vectorization is not available yet.');
+      }
+      return response;
+    },
+    []
+  );
 
-  const warningForMaskCoverage = (mask: DecodedImageMask): string | null => {
+  const warningForMaskCoverage = useCallback((mask: DecodedImageMask): string | null => {
     if (Array.isArray(mask.warnings) && mask.warnings.length > 0) {
       return mask.warnings[0];
     }
@@ -448,7 +452,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
       return 'Detected too much foreground. Increase threshold to avoid blob output.';
     }
     return null;
-  };
+  }, []);
 
   const startVectorizationFromImage = async (base64: string, mimeType?: string | null) => {
     if (isVectorizing) {
@@ -645,6 +649,16 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     } catch (error) {
       drawingLog.error('Error saving drawing', { date, error });
     }
+  };
+
+  const handleUndo = () => {
+    if (paths.length === 0) {
+      return;
+    }
+
+    const newPaths = paths.slice(0, -1);
+    setPaths(newPaths);
+    void saveDrawing(newPaths);
   };
 
   const handleWheel = (event: WheelEvent) => {
@@ -911,14 +925,17 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     ]);
   };
 
-  const runPreviewPass = async (
-    sourceImage: { base64: string; mimeType?: string | null },
-    settings: TraceSettings
-  ): Promise<{ request: DecodedImageMask; response: CompletedVectorizationResponse }> => {
-    const request = await decodeImageToMask(sourceImage.base64, settings, sourceImage.mimeType);
-    const response = await runVectorizationPass(request, settings);
-    return { request, response };
-  };
+  const runPreviewPass = useCallback(
+    async (
+      sourceImage: { base64: string; mimeType?: string | null },
+      settings: TraceSettings
+    ): Promise<{ request: DecodedImageMask; response: CompletedVectorizationResponse }> => {
+      const request = await decodeImageToMask(sourceImage.base64, settings, sourceImage.mimeType);
+      const response = await runVectorizationPass(request, settings);
+      return { request, response };
+    },
+    [runVectorizationPass]
+  );
 
   const closeVectorPreview = () => {
     previewRunIdRef.current += 1;
@@ -928,51 +945,54 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     setIsPreviewProcessing(false);
   };
 
-  const rerunPreviewWithSettings = async (
-    sourceImage: { base64: string; mimeType?: string | null },
-    settings: TraceSettings
-  ) => {
-    const runId = previewRunIdRef.current + 1;
-    previewRunIdRef.current = runId;
+  const rerunPreviewWithSettings = useCallback(
+    async (sourceImage: { base64: string; mimeType?: string | null }, settings: TraceSettings) => {
+      const runId = previewRunIdRef.current + 1;
+      previewRunIdRef.current = runId;
 
-    setIsPreviewProcessing(true);
-    setPreviewErrorMessage(null);
-    try {
-      const { request, response } = await runPreviewPass(sourceImage, settings);
-      setVectorPreview((current) => {
-        if (!current || previewRunIdRef.current !== runId) {
-          return current;
+      setIsPreviewProcessing(true);
+      setPreviewErrorMessage(null);
+      try {
+        const { request, response } = await runPreviewPass(sourceImage, settings);
+        setVectorPreview((current) => {
+          if (!current || previewRunIdRef.current !== runId) {
+            return current;
+          }
+
+          return {
+            ...current,
+            request,
+            settings,
+            response,
+          };
+        });
+        if (previewRunIdRef.current === runId) {
+          setPreviewWarningMessage(warningForMaskCoverage(request));
         }
+      } catch (error) {
+        const message =
+          error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
+            ? 'Those settings exceed local trace limits. Try reducing detail.'
+            : error instanceof Error
+              ? error.message
+              : 'Preview vectorization failed.';
+        if (previewRunIdRef.current === runId) {
+          setPreviewErrorMessage(message);
+        }
+      } finally {
+        if (previewRunIdRef.current === runId) {
+          setIsPreviewProcessing(false);
+        }
+      }
+    },
+    [runPreviewPass, warningForMaskCoverage]
+  );
 
-        return {
-          ...current,
-          request,
-          settings,
-          response,
-        };
-      });
-      if (previewRunIdRef.current === runId) {
-        setPreviewWarningMessage(warningForMaskCoverage(request));
-      }
-    } catch (error) {
-      const message =
-        error instanceof LocalTraceError && error.code === 'TRACE_RESOURCE_LIMIT'
-          ? 'Those settings exceed local trace limits. Try reducing detail.'
-          : error instanceof Error
-            ? error.message
-            : 'Preview vectorization failed.';
-      if (previewRunIdRef.current === runId) {
-        setPreviewErrorMessage(message);
-      }
-    } finally {
-      if (previewRunIdRef.current === runId) {
-        setIsPreviewProcessing(false);
-      }
-    }
-  };
+  const previewSourceImage = vectorPreview?.sourceImage;
+  const previewSettings = vectorPreview?.settings;
 
   useEffect(() => {
-    if (!vectorPreview) {
+    if (!previewSourceImage || !previewSettings) {
       return;
     }
 
@@ -982,20 +1002,13 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     }
 
     const timeout = setTimeout(() => {
-      void rerunPreviewWithSettings(vectorPreview.sourceImage, vectorPreview.settings);
+      void rerunPreviewWithSettings(previewSourceImage, previewSettings);
     }, 220);
 
     return () => {
       clearTimeout(timeout);
     };
-  }, [
-    vectorPreview?.settings.threshold,
-    vectorPreview?.settings.sensitivity,
-    vectorPreview?.settings.speckleMinArea,
-    vectorPreview?.settings.cornerThreshold,
-    vectorPreview?.settings.turnPolicy,
-    vectorPreview?.settings.optimizeCurve,
-  ]);
+  }, [previewSourceImage, previewSettings, rerunPreviewWithSettings]);
 
   const updatePreviewSettings = (patch: Partial<TraceSettings>) => {
     setVectorPreview((current) => {
@@ -1168,50 +1181,49 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
           <View className="flex-1 flex-row items-center pr-2">
             <TouchableOpacity
               onPress={onBack}
-              className="mr-3 h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: palette.tealSoft }}>
-              <Ionicons name="arrow-back" size={23} color={palette.teal} />
+              accessibilityLabel="Go back"
+              className="mr-3 h-11 w-11 items-center justify-center">
+              <Ionicons name="arrow-back" size={25} color={palette.ink} />
             </TouchableOpacity>
             <View className="flex-1">
-              <Text className="text-base font-bold text-ink" numberOfLines={1}>
+              <Text className="text-xl font-bold text-ink" numberOfLines={1}>
                 {journal.name}
               </Text>
-              <Text className="text-xs text-muted" numberOfLines={1}>
+              <Text className="text-sm text-muted" numberOfLines={1}>
                 {formattedDate}
               </Text>
             </View>
           </View>
 
           <View
-            className="flex-row rounded-lg p-1"
-            style={{ backgroundColor: palette.background, position: 'relative' }}>
+            className="ml-auto flex-row items-center justify-end"
+            style={{ position: 'relative' }}>
             <TouchableOpacity
-              onPress={() => handleToolSelect('pen')}
-              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: selectedTool === 'pen' ? palette.teal : 'transparent' }}>
-              <Ionicons
-                name="pencil-outline"
-                size={22}
-                color={selectedTool === 'pen' ? palette.surface : palette.muted}
-              />
+              onPress={handleUndo}
+              disabled={paths.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Undo last stroke"
+              accessibilityState={{ disabled: paths.length === 0 }}
+              className="mr-2 h-11 w-11 items-center justify-center rounded-full"
+              style={{ opacity: paths.length === 0 ? disabledToolbarControlOpacity : 1 }}>
+              <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => handleToolSelect('eraser')}
-              className="mr-1 h-11 w-11 items-center justify-center rounded-lg"
-              style={{
-                backgroundColor: selectedTool === 'eraser' ? palette.secondary : 'transparent',
-              }}>
-              <Ionicons
-                name="remove-circle-outline"
-                size={22}
-                color={selectedTool === 'eraser' ? palette.surface : palette.muted}
-              />
+              onPress={() => handleToolSelect('pen')}
+              accessibilityLabel="Pen tool and color options"
+              className="mr-3 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: palette.teal }}>
+              <Ionicons name="pencil-outline" size={25} color={palette.surface} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleMoreToggle}
-              className="h-11 w-11 items-center justify-center rounded-lg"
-              style={{ backgroundColor: isMoreMenuOpen ? palette.tealSoft : 'transparent' }}>
-              <Ionicons name="ellipsis-horizontal" size={23} color={palette.muted} />
+              accessibilityLabel="More drawing options"
+              className="h-11 w-11 items-center justify-center rounded-full border"
+              style={{
+                backgroundColor: isMoreMenuOpen ? palette.tealSoft : palette.paper,
+                borderColor: palette.border,
+              }}>
+              <Ionicons name="ellipsis-horizontal" size={23} color={palette.ink} />
             </TouchableOpacity>
 
             {isMoreMenuOpen && (
@@ -1221,6 +1233,12 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
                   styles.moreMenu,
                   { backgroundColor: palette.paper, borderColor: palette.border },
                 ]}>
+                <TouchableOpacity
+                  onPress={() => handleToolSelect('eraser')}
+                  className="flex-row items-center rounded-lg px-3 py-3">
+                  <Ionicons name="remove-circle-outline" size={20} color={palette.teal} />
+                  <Text className="ml-3 text-sm font-bold text-ink">Eraser</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCameraAction}
                   onPressIn={() => vectorizationLog.info('Vectorize menu item pressed')}
