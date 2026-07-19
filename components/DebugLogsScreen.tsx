@@ -36,7 +36,9 @@ export const DebugLogsScreen: React.FC<DebugLogsScreenProps> = ({ onBack }) => {
         text: 'Clear',
         onPress: () => {
           setIsLoading(true);
-          void clearCurrentLog().then(loadLogs).catch(loadLogs);
+          void clearCurrentLog().finally(() => {
+            void loadLogs();
+          });
         },
       },
     ]);

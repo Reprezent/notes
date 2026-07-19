@@ -18,7 +18,8 @@ const defaultConfig = {
 export const log = logger.createLogger(defaultConfig);
 
 const getLogFile = () => {
-  const date = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const date = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
   return new FileSystem.File(FileSystem.Paths.document, `notes-${date}.log`);
 };
 
