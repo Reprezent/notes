@@ -1,8 +1,14 @@
-import { logger } from 'react-native-logs';
+import * as FileSystem from 'expo-file-system/legacy';
+import { fileAsyncTransport, logger } from 'react-native-logs';
 
 const defaultConfig = {
   severity: __DEV__ ? 'debug' : 'warn',
-  // Remove transport config that's causing issues
+  transport: fileAsyncTransport,
+  transportOptions: {
+    FS: FileSystem,
+    fileName: 'notes-{date-today}.log',
+    fileNameDateType: 'iso' as const,
+  },
   dateFormat: 'time',
   printLevel: true,
   printDate: true,
@@ -11,7 +17,57 @@ const defaultConfig = {
 
 export const log = logger.createLogger(defaultConfig);
 
-// Simplified approach - use the main logger with prefixes
+const getLogFileUri = () => {
+  if (!FileSystem.documentDirectory) {
+    return null;
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  return `${FileSystem.documentDirectory}notes-${date}.log`;
+};
+
+export const readCurrentLog = async () => {
+  const fileUri = getLogFileUri();
+  if (!fileUri) {
+    return 'Log storage is unavailable on this device.';
+  }
+
+  try {
+    return await FileSystem.readAsStringAsync(fileUri);
+  } catch {
+    return 'No log entries have been recorded yet.';
+  }
+};
+
+export const clearCurrentLog = async () => {
+  const fileUri = getLogFileUri();
+  if (fileUri) {
+    await FileSystem.deleteAsync(fileUri, { idempotent: true });
+  }
+};
+
+type GlobalErrorUtils = {
+  getGlobalHandler: () => (error: Error, isFatal?: boolean) => void;
+  setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
+};
+
+export const installCrashLogger = () => {
+  const errorUtils = (globalThis as typeof globalThis & { ErrorUtils?: GlobalErrorUtils })
+    .ErrorUtils;
+  if (!errorUtils) {
+    return;
+  }
+
+  const previousHandler = errorUtils.getGlobalHandler();
+  errorUtils.setGlobalHandler((error, isFatal) => {
+    log.error(`Unhandled ${isFatal ? 'fatal ' : ''}JavaScript error`, {
+      message: error.message,
+      stack: error.stack,
+    });
+    previousHandler(error, isFatal);
+  });
+};
+
 export const dbLog = {
   debug: (msg: string, ...args: any[]) => log.debug(`[DB] ${msg}`, ...args),
   info: (msg: string, ...args: any[]) => log.info(`[DB] ${msg}`, ...args),
