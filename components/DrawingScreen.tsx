@@ -121,6 +121,14 @@ const createDrawingPathId = () => {
     .slice(2)}`;
 };
 
+const hashDrawingPath = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+};
+
 interface SliderControlProps {
   label: string;
   value: number;
@@ -301,11 +309,12 @@ const normalizeDrawingPaths = (value: unknown): DrawingPath[] => {
       path.fillRule,
       path.transform,
     ]);
-    const occurrence = legacyIdCounts.get(legacyPathKey) ?? 0;
-    legacyIdCounts.set(legacyPathKey, occurrence + 1);
+    const legacyPathHash = hashDrawingPath(legacyPathKey);
+    const occurrence = legacyIdCounts.get(legacyPathHash) ?? 0;
+    legacyIdCounts.set(legacyPathHash, occurrence + 1);
     return {
       ...path,
-      id: `legacy-${legacyPathKey}-${occurrence}`,
+      id: `legacy-${legacyPathHash}-${occurrence}`,
     };
   });
 };
