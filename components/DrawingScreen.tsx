@@ -723,9 +723,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     clearCanvas();
   };
 
+  const erasePath = (pathIndex: number) => {
+    const newPaths = paths.filter((_, index) => index !== pathIndex);
+    setPaths(newPaths);
+    void saveDrawing(newPaths);
+  };
+
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => selectedTool === 'pen',
+    onMoveShouldSetPanResponder: () => selectedTool === 'pen',
 
     onPanResponderGrant: (event) => {
       setActiveToolOptions(null);
@@ -791,15 +797,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
         return;
       }
 
-      if (currentPath && isDrawing) {
+      if (currentPath && isDrawing && selectedTool === 'pen') {
         uiLog.debug('Finished drawing path', {
           tool: selectedTool,
           pathLength: currentPath.length,
         });
         const newDrawingPath: DrawingPath = {
           path: currentPath,
-          color: selectedTool === 'eraser' ? palette.surface : selectedColor,
-          strokeWidth: selectedTool === 'eraser' ? strokeWidth * 3 : strokeWidth,
+          color: selectedColor,
+          strokeWidth,
         };
 
         const newPaths = [...paths, newDrawingPath];
@@ -1348,11 +1354,28 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               />
             ))}
 
-            {currentPath && (
+            {selectedTool === 'eraser' &&
+              paths.map((drawingPath, index) => (
+                <Path
+                  key={`eraser-${index}`}
+                  d={drawingPath.path}
+                  stroke="transparent"
+                  strokeWidth={Math.max(drawingPath.strokeWidth, strokeWidth * 3)}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill={drawingPath.fillColor ? 'transparent' : 'none'}
+                  fillRule={drawingPath.fillRule}
+                  transform={drawingPath.transform}
+                  vectorEffect="non-scaling-stroke"
+                  onPress={() => erasePath(index)}
+                />
+              ))}
+
+            {selectedTool === 'pen' && currentPath && (
               <Path
                 d={currentPath}
-                stroke={selectedTool === 'eraser' ? palette.surface : selectedColor}
-                strokeWidth={selectedTool === 'eraser' ? strokeWidth * 3 : strokeWidth}
+                stroke={selectedColor}
+                strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 fill="none"
