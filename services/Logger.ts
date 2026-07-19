@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { fileAsyncTransport, logger } from 'react-native-logs';
 
 const defaultConfig = {
@@ -17,32 +17,25 @@ const defaultConfig = {
 
 export const log = logger.createLogger(defaultConfig);
 
-const getLogFileUri = () => {
-  if (!FileSystem.documentDirectory) {
-    return null;
-  }
-
+const getLogFile = () => {
   const date = new Date().toISOString().slice(0, 10);
-  return `${FileSystem.documentDirectory}notes-${date}.log`;
+  return new FileSystem.File(FileSystem.Paths.document, `notes-${date}.log`);
 };
 
 export const readCurrentLog = async () => {
-  const fileUri = getLogFileUri();
-  if (!fileUri) {
-    return 'Log storage is unavailable on this device.';
-  }
+  const file = getLogFile();
 
   try {
-    return await FileSystem.readAsStringAsync(fileUri);
+    return file.exists ? await file.text() : 'No log entries have been recorded yet.';
   } catch {
-    return 'No log entries have been recorded yet.';
+    return 'Unable to read the current log file.';
   }
 };
 
 export const clearCurrentLog = async () => {
-  const fileUri = getLogFileUri();
-  if (fileUri) {
-    await FileSystem.deleteAsync(fileUri, { idempotent: true });
+  const file = getLogFile();
+  if (file.exists) {
+    file.delete();
   }
 };
 

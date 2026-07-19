@@ -11,24 +11,22 @@ export const DebugLogsScreen: React.FC<DebugLogsScreenProps> = ({ onBack }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadLogs = useCallback(async () => {
-    setIsLoading(true);
-    setLogs(await readCurrentLog());
-    setIsLoading(false);
+    try {
+      setLogs(await readCurrentLog());
+    } catch {
+      setLogs('Unable to read the current log file.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    void readCurrentLog().then((currentLogs) => {
-      if (isMounted) {
-        setLogs(currentLogs);
-        setIsLoading(false);
-      }
-    });
+    const timer = setTimeout(() => {
+      void loadLogs();
+    }, 0);
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    return () => clearTimeout(timer);
+  }, [loadLogs]);
 
   const clearLogs = () => {
     Alert.alert('Clear logs?', 'This removes the current log file.', [
@@ -37,7 +35,8 @@ export const DebugLogsScreen: React.FC<DebugLogsScreenProps> = ({ onBack }) => {
         style: 'destructive',
         text: 'Clear',
         onPress: () => {
-          void clearCurrentLog().then(loadLogs);
+          setIsLoading(true);
+          void clearCurrentLog().then(loadLogs).catch(loadLogs);
         },
       },
     ]);
@@ -51,7 +50,10 @@ export const DebugLogsScreen: React.FC<DebugLogsScreenProps> = ({ onBack }) => {
         </TouchableOpacity>
         <View className="flex-row gap-2">
           <TouchableOpacity
-            onPress={() => void loadLogs()}
+            onPress={() => {
+              setIsLoading(true);
+              void loadLogs();
+            }}
             className="rounded-lg bg-paper px-4 py-3">
             <Text className="font-bold text-ink">Refresh</Text>
           </TouchableOpacity>
