@@ -1,8 +1,21 @@
-import { logger } from 'react-native-logs';
+import * as FileSystem from 'expo-file-system';
+import { fileAsyncTransport, logger } from 'react-native-logs';
+
+const getLogFileName = () => {
+  const today = new Date();
+  const date = today.toISOString().slice(0, 10);
+  return `notes-${date}.log`;
+};
+
+const logFileName = getLogFileName();
 
 const defaultConfig = {
   severity: __DEV__ ? 'debug' : 'warn',
-  // Remove transport config that's causing issues
+  transport: fileAsyncTransport,
+  transportOptions: {
+    FS: FileSystem,
+    fileName: logFileName,
+  },
   dateFormat: 'time',
   printLevel: true,
   printDate: true,
@@ -11,7 +24,49 @@ const defaultConfig = {
 
 export const log = logger.createLogger(defaultConfig);
 
-// Simplified approach - use the main logger with prefixes
+const getLogFile = () => {
+  return new FileSystem.File(FileSystem.Paths.document, logFileName);
+};
+
+export const readCurrentLog = async () => {
+  const file = getLogFile();
+
+  try {
+    return file.exists ? await file.text() : 'No log entries have been recorded yet.';
+  } catch {
+    return 'Unable to read the current log file.';
+  }
+};
+
+export const clearCurrentLog = async () => {
+  const file = getLogFile();
+  if (file.exists) {
+    await file.delete();
+  }
+};
+
+type GlobalErrorUtils = {
+  getGlobalHandler: () => (error: Error, isFatal?: boolean) => void;
+  setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
+};
+
+export const installCrashLogger = () => {
+  const errorUtils = (globalThis as typeof globalThis & { ErrorUtils?: GlobalErrorUtils })
+    .ErrorUtils;
+  if (!errorUtils) {
+    return;
+  }
+
+  const previousHandler = errorUtils.getGlobalHandler();
+  errorUtils.setGlobalHandler((error, isFatal) => {
+    log.error(`Unhandled ${isFatal ? 'fatal ' : ''}JavaScript error`, {
+      message: error.message,
+      stack: error.stack,
+    });
+    previousHandler(error, isFatal);
+  });
+};
+
 export const dbLog = {
   debug: (msg: string, ...args: any[]) => log.debug(`[DB] ${msg}`, ...args),
   info: (msg: string, ...args: any[]) => log.info(`[DB] ${msg}`, ...args),
