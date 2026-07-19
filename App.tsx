@@ -3,15 +3,18 @@ import { StatusBar } from 'expo-status-bar';
 import { AppShell } from 'components/AppShell';
 import { HomeScreen } from 'components/HomeScreen';
 import { DrawingScreen } from 'components/DrawingScreen';
+import { DebugLogsScreen } from 'components/DebugLogsScreen';
 import { ThemeProvider } from 'components/theme';
 import { databaseService } from 'services/DatabaseService';
 import { JournalTypeId } from 'services/JournalTypes';
-import { log } from 'services/Logger';
+import { installCrashLogger, log } from 'services/Logger';
 import 'services/LocalVectorizationBundle';
 
 import './tailwind.css';
 
-type Screen = 'home' | 'drawing';
+installCrashLogger();
+
+type Screen = 'home' | 'drawing' | 'debug-logs';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -51,9 +54,20 @@ export default function App() {
     setHomeKey((previous) => previous + 1);
   };
 
+  const menuItems = __DEV__
+    ? [
+        {
+          description: 'View the current app log file',
+          icon: 'bug-outline' as const,
+          label: 'Debug logs',
+          onPress: () => setCurrentScreen('debug-logs' as const),
+        },
+      ]
+    : [];
+
   return (
     <ThemeProvider>
-      <AppShell menuItems={[]}>
+      <AppShell menuItems={menuItems}>
         {() => (
           <>
             {currentScreen === 'home' ? (
@@ -69,6 +83,8 @@ export default function App() {
                 initialImage={selectedJournal.initialImage}
                 onBack={handleBackToHome}
               />
+            ) : currentScreen === 'debug-logs' ? (
+              <DebugLogsScreen onBack={handleBackToHome} />
             ) : null}
             <StatusBar style="dark" />
           </>
