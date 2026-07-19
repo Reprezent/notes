@@ -78,6 +78,7 @@ interface DrawingScreenProps {
 }
 
 interface DrawingPath {
+  id: string;
   path: string;
   color: string;
   strokeWidth: number;
@@ -91,6 +92,8 @@ interface PersistedDrawing {
 }
 
 const strokeWidths = [1, 3, 6, 10];
+const ERASER_HIT_TARGET_MULTIPLIER = 3;
+let nextDrawingPathId = 0;
 const disabledToolbarControlOpacity = 0.4;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
@@ -107,6 +110,24 @@ const roundToStep = (value: number, minimum: number, step: number) => {
   }
   const steps = Math.round((value - minimum) / step);
   return minimum + steps * step;
+};
+
+const createDrawingPathId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `path-${Date.now().toString(36)}-${nextDrawingPathId++}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+};
+
+const hashDrawingPath = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
 };
 
 interface SliderControlProps {
@@ -258,6 +279,7 @@ const isDrawingPath = (value: unknown): value is DrawingPath => {
 
   const candidate = value as Record<string, unknown>;
   return (
+    (candidate.id === undefined || typeof candidate.id === 'string') &&
     typeof candidate.path === 'string' &&
     typeof candidate.color === 'string' &&
     typeof candidate.strokeWidth === 'number' &&
@@ -269,10 +291,39 @@ const isDrawingPath = (value: unknown): value is DrawingPath => {
   );
 };
 
+const normalizeDrawingPaths = (value: unknown): DrawingPath[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const legacyIdCounts = new Map<string, number>();
+  return value.filter(isDrawingPath).map((path) => {
+    if (path.id) {
+      return path;
+    }
+
+    const legacyPathKey = JSON.stringify([
+      path.path,
+      path.color,
+      path.strokeWidth,
+      path.fillColor,
+      path.fillRule,
+      path.transform,
+    ]);
+    const legacyPathHash = hashDrawingPath(legacyPathKey);
+    const occurrence = legacyIdCounts.get(legacyPathHash) ?? 0;
+    legacyIdCounts.set(legacyPathHash, occurrence + 1);
+    return {
+      ...path,
+      id: `legacy-${legacyPathHash}-${occurrence}`,
+    };
+  });
+};
+
 const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
   if (Array.isArray(value)) {
     return {
-      paths: value.filter(isDrawingPath),
+      paths: normalizeDrawingPaths(value),
     };
   }
 
@@ -282,7 +333,7 @@ const normalizePersistedDrawing = (value: unknown): PersistedDrawing => {
 
   const candidate = value as Record<string, unknown>;
   return {
-    paths: Array.isArray(candidate.paths) ? candidate.paths.filter(isDrawingPath) : [],
+    paths: normalizeDrawingPaths(candidate.paths),
   };
 };
 
@@ -310,6 +361,7 @@ const drawingPathsFromVectorization = (
 ): DrawingPath[] => {
   const transform = fitViewBoxToCanvas(response.viewBox, canvasWidth, canvasHeight);
   return response.paths.map((record) => ({
+    id: createDrawingPathId(),
     path: record.path,
     color,
     strokeWidth: 0,
@@ -737,9 +789,15 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
     clearCanvas();
   };
 
+  const erasePath = (pathId: string) => {
+    const newPaths = paths.filter((path) => path.id !== pathId);
+    setPaths(newPaths);
+    void saveDrawing(newPaths);
+  };
+
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => selectedTool === 'pen',
+    onMoveShouldSetPanResponder: () => selectedTool === 'pen',
 
     onPanResponderGrant: (event) => {
       setActiveToolOptions(null);
@@ -805,15 +863,16 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
         return;
       }
 
-      if (currentPath && isDrawing) {
+      if (currentPath && isDrawing && selectedTool === 'pen') {
         uiLog.debug('Finished drawing path', {
           tool: selectedTool,
           pathLength: currentPath.length,
         });
         const newDrawingPath: DrawingPath = {
+          id: createDrawingPathId(),
           path: currentPath,
-          color: selectedTool === 'eraser' ? palette.surface : selectedColor,
-          strokeWidth: selectedTool === 'eraser' ? strokeWidth * 3 : strokeWidth,
+          color: selectedColor,
+          strokeWidth,
         };
 
         const newPaths = [...paths, newDrawingPath];
@@ -1353,7 +1412,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
 
             {paths.map((drawingPath, index) => (
               <Path
-                key={index}
+                key={drawingPath.id}
                 d={drawingPath.path}
                 stroke={drawingPath.fillColor ? 'none' : drawingPath.color}
                 strokeWidth={drawingPath.strokeWidth}
@@ -1366,11 +1425,29 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               />
             ))}
 
-            {currentPath && (
+            {selectedTool === 'eraser' &&
+              paths.map((drawingPath) => (
+                <Path
+                  key={`eraser-${drawingPath.id}`}
+                  d={drawingPath.path}
+                  stroke="transparent"
+                  // Combined widths detect overlap between the eraser and visible stroke.
+                  strokeWidth={drawingPath.strokeWidth + strokeWidth * ERASER_HIT_TARGET_MULTIPLIER}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill={drawingPath.fillColor ? 'transparent' : 'none'}
+                  fillRule={drawingPath.fillRule}
+                  transform={drawingPath.transform}
+                  vectorEffect="non-scaling-stroke"
+                  onPress={() => erasePath(drawingPath.id)}
+                />
+              ))}
+
+            {selectedTool === 'pen' && currentPath && (
               <Path
                 d={currentPath}
-                stroke={selectedTool === 'eraser' ? palette.surface : selectedColor}
-                strokeWidth={selectedTool === 'eraser' ? strokeWidth * 3 : strokeWidth}
+                stroke={selectedColor}
+                strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 fill="none"
