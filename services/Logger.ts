@@ -1,13 +1,20 @@
 import * as FileSystem from 'expo-file-system';
 import { fileAsyncTransport, logger } from 'react-native-logs';
 
+const getLogFileName = () => {
+  const today = new Date();
+  const date = today.toISOString().slice(0, 10);
+  return `notes-${date}.log`;
+};
+
+const logFileName = getLogFileName();
+
 const defaultConfig = {
   severity: __DEV__ ? 'debug' : 'warn',
   transport: fileAsyncTransport,
   transportOptions: {
     FS: FileSystem,
-    fileName: 'notes-{date-today}.log',
-    fileNameDateType: 'iso' as const,
+    fileName: logFileName,
   },
   dateFormat: 'time',
   printLevel: true,
@@ -18,9 +25,7 @@ const defaultConfig = {
 export const log = logger.createLogger(defaultConfig);
 
 const getLogFile = () => {
-  const today = new Date();
-  const date = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-  return new FileSystem.File(FileSystem.Paths.document, `notes-${date}.log`);
+  return new FileSystem.File(FileSystem.Paths.document, logFileName);
 };
 
 export const readCurrentLog = async () => {
@@ -36,7 +41,7 @@ export const readCurrentLog = async () => {
 export const clearCurrentLog = async () => {
   const file = getLogFile();
   if (file.exists) {
-    file.delete();
+    await file.delete();
   }
 };
 
