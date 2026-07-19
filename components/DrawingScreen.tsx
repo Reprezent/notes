@@ -1134,7 +1134,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
             </View>
           </View>
 
-          <View className="flex-row items-center" style={{ position: 'relative' }}>
+          <View className="ml-auto flex-row items-center justify-end" style={{ position: 'relative' }}>
             <TouchableOpacity
               onPress={handleUndo}
               disabled={paths.length === 0}
@@ -1144,16 +1144,6 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
               className="mr-2 h-11 w-11 items-center justify-center rounded-full"
               style={{ opacity: paths.length === 0 ? disabledToolbarControlOpacity : 1 }}>
               <Ionicons name="arrow-undo-outline" size={25} color={palette.ink} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              disabled
-              accessibilityRole="button"
-              accessibilityLabel="Search drawing unavailable"
-              accessibilityHint="Search is unavailable for canvas drawings."
-              accessibilityState={{ disabled: true }}
-              className="mr-2 h-11 w-11 items-center justify-center rounded-full"
-              style={{ opacity: disabledToolbarControlOpacity }}>
-              <Ionicons name="search-outline" size={25} color={palette.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleToolSelect('pen')}
