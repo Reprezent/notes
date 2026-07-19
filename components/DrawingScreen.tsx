@@ -93,6 +93,7 @@ interface PersistedDrawing {
 
 const strokeWidths = [1, 3, 6, 10];
 const ERASER_HIT_TARGET_MULTIPLIER = 3;
+let nextDrawingPathId = 0;
 const backgroundOptions: { label: string; value: JournalBackgroundStyle }[] = [
   { label: 'Ruled', value: 'ruled' },
   { label: 'Grid', value: 'grid' },
@@ -109,6 +110,8 @@ const roundToStep = (value: number, minimum: number, step: number) => {
   const steps = Math.round((value - minimum) / step);
   return minimum + steps * step;
 };
+
+const createDrawingPathId = () => `path-${Date.now()}-${nextDrawingPathId++}`;
 
 interface SliderControlProps {
   label: string;
@@ -323,7 +326,7 @@ const drawingPathsFromVectorization = (
 ): DrawingPath[] => {
   const transform = fitViewBoxToCanvas(response.viewBox, canvasWidth, canvasHeight);
   return response.paths.map((record) => ({
-    id: crypto.randomUUID(),
+    id: createDrawingPathId(),
     path: record.path,
     color,
     strokeWidth: 0,
@@ -818,7 +821,7 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
           pathLength: currentPath.length,
         });
         const newDrawingPath: DrawingPath = {
-          id: crypto.randomUUID(),
+          id: createDrawingPathId(),
           path: currentPath,
           color: selectedColor,
           strokeWidth,
@@ -1376,9 +1379,10 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
                   key={`eraser-${drawingPath.id}`}
                   d={drawingPath.path}
                   stroke="transparent"
-                  strokeWidth={
-                    Math.max(drawingPath.strokeWidth, strokeWidth * ERASER_HIT_TARGET_MULTIPLIER)
-                  }
+                  strokeWidth={Math.max(
+                    drawingPath.strokeWidth,
+                    strokeWidth * ERASER_HIT_TARGET_MULTIPLIER
+                  )}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill={drawingPath.fillColor ? 'transparent' : 'none'}
