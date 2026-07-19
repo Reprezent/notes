@@ -1384,11 +1384,8 @@ export const DrawingScreen: React.FC<DrawingScreenProps> = ({
                   key={`eraser-${drawingPath.id}`}
                   d={drawingPath.path}
                   stroke="transparent"
-                  // Keep the complete visible stroke within the eraser hit target.
-                  strokeWidth={Math.max(
-                    drawingPath.strokeWidth,
-                    strokeWidth * ERASER_HIT_TARGET_MULTIPLIER
-                  )}
+                  // Combined widths detect overlap between the eraser and visible stroke.
+                  strokeWidth={drawingPath.strokeWidth + strokeWidth * ERASER_HIT_TARGET_MULTIPLIER}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill={drawingPath.fillColor ? 'transparent' : 'none'}
