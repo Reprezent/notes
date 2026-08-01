@@ -50,12 +50,13 @@
     "@babel/plugin-transform-react-jsx": "^7.29.7",
     "@eslint/compat": "^2.1.0",
     "@types/react": "~19.2.4",
+    "@typescript-eslint/parser": "^8.65.0",
     "eslint": "^10.6.0",
     "eslint-config-expo": "~57.0.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-import-resolver-typescript": "^4.4.5",
     "prettier": "^3.9.4",
-    "typescript": "~7.0.2"
+    "typescript": "~6.0.3"
   },
   "main": "node_modules/expo/AppEntry.js",
   "expo": {
