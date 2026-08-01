@@ -55,7 +55,7 @@
     "eslint-config-prettier": "^10.1.2",
     "eslint-import-resolver-typescript": "^4.4.5",
     "prettier": "^3.9.4",
-    "typescript": "~6.0.3"
+    "typescript": "~7.0.2"
   },
   "main": "node_modules/expo/AppEntry.js",
   "expo": {
