@@ -54,7 +54,7 @@ jobs:
 
       - name: Install wasm-bindgen CLI
         if: github.event_name == 'push' || github.event.action != 'closed'
-        run: cargo install --locked wasm-bindgen-cli
+        run: cargo install --locked wasm-bindgen-cli --version 0.2.126
 
       - name: Build Rust web artifacts for Expo runtime
         if: github.event_name == 'push' || github.event.action != 'closed'
