@@ -43,7 +43,9 @@ jobs:
         run: npm ci
 
       - name: Install wasm-bindgen CLI
-        run: cargo install --locked wasm-bindgen-cli --version 0.2.126
+        run: |
+          WASM_BINDGEN_VERSION="$(cargo metadata --locked --format-version 1 | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version')"
+          cargo install --locked wasm-bindgen-cli --version "${WASM_BINDGEN_VERSION}"
 
       - name: Build Rust web artifacts for Expo runtime
         run: npm run tracer:build:web
