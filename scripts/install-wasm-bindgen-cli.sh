@@ -3,9 +3,16 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-wasm_bindgen_version="$(
+mapfile -t wasm_bindgen_versions < <(
   cargo metadata --locked --format-version 1 |
     jq -r '.packages[] | select(.name == "wasm-bindgen") | .version'
-)"
+)
 
-cargo install --locked wasm-bindgen-cli --version "${wasm_bindgen_version}"
+if [ "${#wasm_bindgen_versions[@]}" -ne 1 ] || [ -z "${wasm_bindgen_versions[0]}" ]; then
+  echo "Expected exactly one wasm-bindgen version from cargo metadata." >&2
+  printf 'Found versions:\n' >&2
+  printf '  %s\n' "${wasm_bindgen_versions[@]}" >&2
+  exit 1
+fi
+
+cargo install --locked wasm-bindgen-cli --version "${wasm_bindgen_versions[0]}"
